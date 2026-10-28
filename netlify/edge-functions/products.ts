@@ -2,8 +2,10 @@
    PRODUCTS API — Netlify Edge Function (runtime Deno)
    ──────────────────────────────────────────────────────────────
    ✅ Exécutée au plus près de l'utilisateur (latence minimale, pas de cold start)
-   ✅ Aucune clé Supabase dans le bundle client : le navigateur appelle /api/products
-   ✅ Moindre privilège : clé ANON côté edge (les RPC publiques n'exigent pas service_role)
+   ✅ Aucune clé Supabase dans le bundle client : le navigateur appelle uniquement /api/products
+   ✅ Accès base via SUPABASE_SERVICE_ROLE_KEY (variable serveur Netlify) : l'accès anon peut
+      ainsi être révoqué dans Supabase (voir supabase/lockdown.sql)
+   ✅ Noms de procédures fixes, aucune entrée utilisateur transmise à la base
    ✅ Rate limiting par IP (60 req/min, par instance edge)
    ✅ Méthode GET uniquement
    ✅ Headers de sécurité (nosniff, DENY framing, CSP restrictive pour du JSON)
@@ -75,12 +77,12 @@ export default async (req: Request, context: Context) => {
     })
   }
 
-  // Variables d'environnement Netlify (Dashboard). Clé anon en priorité (moindre privilège) ;
-  // service_role n'est qu'un dernier recours de compatibilité.
-  const env = (name: string) => Netlify.env.get(name)
-  const supabaseUrl = env("SUPABASE_URL") || env("VITE_SUPABASE_URL")
-  const supabaseKey =
-    env("SUPABASE_ANON_KEY") || env("VITE_SUPABASE_ANON_KEY") || env("SUPABASE_SERVICE_ROLE_KEY")
+  // Variables d'environnement Netlify (Dashboard → Site configuration → Environment variables).
+  // SUPABASE_SERVICE_ROLE_KEY n'existe QUE côté serveur : jamais de préfixe VITE_, jamais dans le bundle.
+  // Pas de repli sur la clé anon : si la clé serveur manque, la fonction échoue (fail closed)
+  // et le site retombe sur le catalogue embarqué.
+  const supabaseUrl = Netlify.env.get("SUPABASE_URL")
+  const supabaseKey = Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
   if (!supabaseUrl || !supabaseKey || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(supabaseUrl)) {
     return new Response(JSON.stringify({ error: "Configuration serveur manquante" }), {
@@ -90,6 +92,8 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
+    // Seules ces deux procédures sont appelées, avec des noms fixes : aucune donnée
+    // venant du navigateur n'est transmise à Supabase (pas d'injection possible).
     const [catalog2, publicProducts] = await Promise.all([
       callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
       callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),

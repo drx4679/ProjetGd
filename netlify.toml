@@ -36,7 +36,7 @@
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     Cross-Origin-Opener-Policy = "same-origin"
     X-Permitted-Cross-Domain-Policies = "none"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://jhybjpetiotzbtkfbxkr.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://jhybjpetiotzbtkfbxkr.supabase.co https://nominatim.openstreetmap.org https://router.project-osrm.org; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://jhybjpetiotzbtkfbxkr.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
 
 # ── index.html : toujours revalidé (évite de servir un vieux bundle/CSP) ──
 [[headers]]

@@ -1,4 +1,4 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
@@ -23,6 +23,7 @@ react(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
       gdSecurityPlugin(),
+      gdLocalApiPlugin(),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
@@ -56,6 +57,38 @@ react(),
 })
 
 /**
+ * API locale (dev uniquement) : sert /api/products avec LE MÊME code que la Netlify Edge Function
+ * (netlify/edge-functions/products.ts). Les variables du fichier .env (SUPABASE_URL,
+ * SUPABASE_SERVICE_ROLE_KEY...) sont lues ici, côté Node : elles ne sont jamais envoyées au navigateur
+ * (seules les variables préfixées VITE_ le sont). En production, c'est Netlify qui exécute la fonction.
+ */
+function gdLocalApiPlugin(): Plugin {
+  return {
+    name: 'gd-local-api',
+    apply: 'serve',
+    configureServer(server) {
+      const env = loadEnv(server.config.mode, server.config.root, '')
+      // Simule le global `Netlify` du runtime Deno de Netlify
+      ;(globalThis as any).Netlify = { env: { get: (key: string) => env[key] } }
+
+      server.middlewares.use('/api/products', async (req, res, next) => {
+        try {
+          const mod = await server.ssrLoadModule('/netlify/edge-functions/products.ts')
+          const method = req.method || 'GET'
+          const request = new Request('http://localhost/api/products', { method })
+          const response: Response = await mod.default(request, { ip: req.socket.remoteAddress })
+          res.statusCode = response.status
+          response.headers.forEach((value, key) => res.setHeader(key, value))
+          res.end(Buffer.from(await response.arrayBuffer()))
+        } catch (err) {
+          next(err as Error)
+        }
+      })
+    },
+  }
+}
+
+/**
  * Sécurité GoodDoctor's Shop — source unique de la Content-Security-Policy.
  * - Build : injecte une balise <meta> CSP stricte (sans 'unsafe-inline' pour les scripts),
  *   valable quel que soit l'hébergeur (Netlify, Figma Make...).
@@ -71,7 +104,7 @@ function gdSecurityPlugin(): Plugin {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
     "font-src 'self' https://fonts.gstatic.com",
     `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com`,
-    `connect-src 'self' ${SUPABASE} https://nominatim.openstreetmap.org https://router.project-osrm.org`,
+    `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org`,
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",

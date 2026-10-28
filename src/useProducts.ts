@@ -219,39 +219,18 @@ export function useProducts() {
 
     async function load() {
       // Rafraîchissement en arrière-plan.
-      // PRODUCTION : via la fonction serveur /api/products (aucune clé dans le bundle).
-      // DEV LOCAL : appel direct Supabase avec la clé anon publique (code retiré du build prod).
+      // Le navigateur ne parle JAMAIS à Supabase : il appelle uniquement /api/products
+      // (Netlify Edge Function en production, même fonction servie par Vite en dev local).
+      // La clé SUPABASE_SERVICE_ROLE_KEY reste côté serveur.
       try {
         let catalog2: any[] = []
         let publicData: any[] = []
 
-        if (import.meta.env.DEV) {
-          const url = import.meta.env.VITE_SUPABASE_URL
-          const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-          if (url && key) {
-            const headers = {
-              apikey: key,
-              Authorization: `Bearer ${key}`,
-              'Content-Type': 'application/json',
-            }
-            const [c2, pb] = await Promise.all([
-              fetch(`${url}/rest/v1/rpc/get_catalog2_articles`, { method: 'POST', headers, body: '{}' })
-                .then(r => (r.ok ? r.json() : []))
-                .catch(() => []),
-              fetch(`${url}/rest/v1/rpc/get_public_products`, { method: 'POST', headers, body: '{}' })
-                .then(r => (r.ok ? r.json() : []))
-                .catch(() => []),
-            ])
-            catalog2 = Array.isArray(c2) ? c2 : []
-            publicData = Array.isArray(pb) ? pb : []
-          }
-        } else {
-          const res = await fetch('/api/products', { headers: { Accept: 'application/json' } })
-          if (res.ok) {
-            const json = await res.json()
-            catalog2 = Array.isArray(json?.catalog2) ? json.catalog2 : []
-            publicData = Array.isArray(json?.publicProducts) ? json.publicProducts : []
-          }
+        const res = await fetch('/api/products', { headers: { Accept: 'application/json' } })
+        if (res.ok) {
+          const json = await res.json()
+          catalog2 = Array.isArray(json?.catalog2) ? json.catalog2 : []
+          publicData = Array.isArray(json?.publicProducts) ? json.publicProducts : []
         }
 
         const merged = [
