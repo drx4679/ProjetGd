@@ -1,0 +1,244 @@
+/* ========================================================
+   PAGES LÉGALES & À PROPOS (GoodDoctor's Shop)
+   ======================================================== */
+.legal-view-container {
+  min-height: 70vh;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 960px;
+  padding: 130px 24px 80px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .legal-view-container {
+    padding: 105px 18px 60px;
+  }
+}
+
+.legal-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+
+.legal-back-btn:hover {
+  background: var(--color-accent, #087fb5);
+  border-color: var(--color-accent, #087fb5);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(8, 127, 181, 0.25);
+}
+
+.legal-view-container h1 {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+}
+
+.legal-view-container h2 {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.legal-view-container p {
+  line-height: 1.8;
+  color: #475569;
+}
+
+.legal-view-container .feature-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.legal-view-container .feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(8, 127, 181, 0.12);
+}
+
+.animate-fadeIn {
+  animation: legalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes legalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================================
+   SITE FOOTER ENRICHI (GoodDoctor's Shop)
+   ======================================================== */
+.site-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+  padding: 60px 5% 32px !important;
+  margin-top: 60px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1.2fr 1fr 1fr;
+  gap: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.footer-brand-desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #64748b;
+  max-width: 280px;
+}
+
+.brand-highlight {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.footer-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.footer-col-title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #0f172a;
+  margin: 0;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-links li button,
+.footer-links li a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+  text-align: left;
+}
+
+.footer-links li button:hover,
+.footer-links li a:hover {
+  color: var(--color-accent, #087fb5);
+  transform: translateX(2px);
+}
+
+.footer-socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-socials a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.footer-socials a:hover {
+  color: var(--color-accent, #087fb5);
+  border-color: var(--color-accent, #087fb5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(8, 127, 181, 0.15);
+}
+
+.footer-socials-note {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 24px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 900px) {
+  .footer-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .site-footer {
+    padding: 40px 5% 24px !important;
+    margin-top: 40px !important;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+

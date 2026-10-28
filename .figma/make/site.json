@@ -1,0 +1,10 @@
+{
+  "description": "Découvrez et achetez des vêtements de sport et des chaussures dans une boutique en ligne moderne conçue pour simplifier vos achats.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

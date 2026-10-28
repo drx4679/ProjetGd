@@ -1,0 +1,51 @@
+# ══════════════════════════════════════════════════════════════
+#  Netlify Configuration — GoodDoctor's Shop (D:\ProjetGd)
+# ══════════════════════════════════════════════════════════════
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[dev]
+  command = "npm run dev"
+  targetPort = 8443
+  port = 8888
+
+# ── /api/products : Netlify Edge Function (netlify/edge-functions/products.ts) ──
+# Le chemin est déclaré dans `export const config` de la fonction ; les edge functions
+# s'exécutent avant les redirections, le fallback SPA ci-dessous ne l'intercepte donc pas.
+
+# ── SPA fallback ──
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ══════════════════════════════════════════════════════════════
+#  HEADERS DE SÉCURITÉ GLOBAUX
+# ══════════════════════════════════════════════════════════════
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "0"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(self), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Cross-Origin-Opener-Policy = "same-origin"
+    X-Permitted-Cross-Domain-Policies = "none"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://jhybjpetiotzbtkfbxkr.supabase.co https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://jhybjpetiotzbtkfbxkr.supabase.co https://nominatim.openstreetmap.org https://router.project-osrm.org; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+
+# ── index.html : toujours revalidé (évite de servir un vieux bundle/CSP) ──
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# ── Cache agressif pour les assets buildés ──
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

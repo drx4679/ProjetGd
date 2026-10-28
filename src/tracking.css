@@ -1,0 +1,40 @@
+.hero-cta { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.tracking-link { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 17px 20px; border: 1px solid #ffffff80; color: white; font-size: 12px; font-weight: 600; transition: background .2s; }
+.tracking-link:hover { background: #ffffff15; }
+.tracking-page { max-width: 1150px; margin: auto; padding: 35px 5% 65px; }
+.tracking-back { width: fit-content; font-size: 12px; }
+.tracking-intro { padding: 45px 0 35px; }
+.tracking-intro .eyebrow { color: var(--color-accent); display: block; }
+.tracking-intro h1 { font-size: 42px; letter-spacing: -1.8px; line-height: 1.2; }
+.tracking-intro > p { font-size: 14px; color: #75828c; margin-top: 16px; }
+.tracking-layout { display: grid; grid-template-columns: 1fr 1.2fr; align-items: start; gap: 25px; }
+.tracking-card { padding: 30px; border: 1px solid #e6eaed; background: white; border-radius: 14px; }
+.tracking-card h2, .tracking-help h2 { font-size: 22px; letter-spacing: -.7px; }
+.tracking-muted { font-size: 12px; color: #75828c; line-height: 1.8; margin-top: 12px; }
+.tracking-example { color: var(--color-accent); text-decoration: underline; font-size: 12px; text-underline-offset: 4px; }
+.tracking-status { display: inline-block; font-size: 9px; letter-spacing: 1px; background: #e0f2fa; color: var(--color-accent); border-radius: 5px; padding: 8px 10px; margin-bottom: 18px; }
+.tracking-result { min-height: 350px; }
+.tracking-empty-icon { margin-top: 30px; display: grid; place-items: center; height: 110px; color: var(--color-accent); background: #f3f8fb; border-radius: 10px; }
+.tracking-timeline { list-style: none; margin-top: 30px; }
+.tracking-timeline li { position: relative; display: flex; gap: 16px; padding-bottom: 28px; color: #9aa5ab; }
+.tracking-timeline li:not(:last-child)::before { content: ''; position: absolute; left: 15px; top: 32px; bottom: 0; width: 1px; background: #dce5ea; }
+.tracking-dot { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #dce5ea; border-radius: 50%; flex-shrink: 0; font-size: 11px; }
+.tracking-timeline .complete, .tracking-timeline .current { color: var(--color-ink); }
+.tracking-timeline .complete .tracking-dot { background: #e0f2fa; color: var(--color-accent); border-color: #e0f2fa; }
+.tracking-timeline .current .tracking-dot { background: var(--color-accent); border-color: var(--color-accent); color: white; }
+.tracking-timeline b { font-size: 13px; }
+.tracking-timeline p { font-size: 11px; margin-top: 5px; line-height: 1.6; }
+.tracking-timeline small { display: block; font-size: 10px; color: var(--color-accent); margin-top: 8px; }
+.tracking-help { margin-top: 40px; max-width: 700px; }
+.tracking-help details { padding: 18px 0; border-bottom: 1px solid #e6eaed; font-size: 13px; }
+.tracking-help summary { cursor: pointer; font-weight: 600; }
+.tracking-help details p { font-size: 12px; line-height: 1.8; color: #75828c; margin-top: 12px; }
+@media (max-width: 600px) {
+  .tracking-layout { grid-template-columns: 1fr; gap: 18px; }
+  .tracking-intro { padding-top: 30px; }
+  .tracking-intro h1 { font-size: 32px; }
+  .tracking-intro .eyebrow { font-size: 8px; }
+  .tracking-card { padding: 23px; }
+  .hero-cta { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .tracking-link { padding: 13px 20px; }
+}
