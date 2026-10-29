@@ -51,6 +51,66 @@ async function callRpc(url: string, key: string, fn: string): Promise<unknown[]>
   return Array.isArray(data) ? data : []
 }
 
+/**
+ * Nettoie les articles catalog2 côté serveur avant envoi au navigateur :
+ * retire les quantités exactes de stock (stock_qty), SKU internes, poids et IDs internes de variantes.
+ */
+function sanitizeCatalog2Item(item: any) {
+  if (!item || typeof item !== "object") return null
+  return {
+    id: item.id,
+    _original_id: item._original_id,
+    name: item.name || "",
+    description: item.description || "",
+    price: item.price || 0,
+    category: item.category || "Général",
+    in_stock: Boolean(item.in_stock),
+    is_featured: Boolean(item.is_featured),
+    promotion_type: item.promotion_type || null,
+    promotion_value: item.promotion_value || 0,
+    image_url: item.image_url || "",
+    images: Array.isArray(item.images) ? item.images : [],
+    models: Array.isArray(item.models)
+      ? item.models.map((m: any) => ({
+          name: m?.name || "",
+          sale_price: m?.sale_price ?? null,
+          colors: Array.isArray(m?.colors)
+            ? m.colors.map((c: any) => ({
+                name: c?.name || "",
+                sale_price: c?.sale_price ?? null,
+                sizes: Array.isArray(c?.sizes)
+                  ? c.sizes.map((s: any) => ({
+                      name: s?.name || "",
+                      sale_price: s?.sale_price ?? null,
+                    }))
+                  : [],
+              }))
+            : [],
+        }))
+      : [],
+  }
+}
+
+function sanitizePublicItem(item: any) {
+  if (!item || typeof item !== "object") return null
+  return {
+    id: item.id,
+    name: item.name || "",
+    description: item.description || "",
+    price: item.price || 0,
+    promo_price: item.promo_price ?? null,
+    promotion_type: item.promotion_type || null,
+    promotion_value: item.promotion_value || 0,
+    category: item.category || "Général",
+    in_stock: Boolean(item.in_stock),
+    is_featured: Boolean(item.is_featured),
+    image_url: item.image_url || "",
+    images: Array.isArray(item.images) ? item.images : [],
+    color: Array.isArray(item.color) ? item.color : [],
+    size: Array.isArray(item.size) ? item.size : [],
+  }
+}
+
 export default async (req: Request, context: Context) => {
   const secHeaders = {
     "Content-Type": "application/json; charset=utf-8",
@@ -94,10 +154,13 @@ export default async (req: Request, context: Context) => {
   try {
     // Seules ces deux procédures sont appelées, avec des noms fixes : aucune donnée
     // venant du navigateur n'est transmise à Supabase (pas d'injection possible).
-    const [catalog2, publicProducts] = await Promise.all([
+    const [rawCatalog2, rawPublicProducts] = await Promise.all([
       callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
       callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
     ])
+
+    const catalog2 = rawCatalog2.map(sanitizeCatalog2Item).filter(Boolean)
+    const publicProducts = rawPublicProducts.map(sanitizePublicItem).filter(Boolean)
 
     return new Response(JSON.stringify({ catalog2, publicProducts }), {
       status: 200,

@@ -76,6 +76,29 @@ function transformCatalog2Product(item: any): Product {
   const name = item.name || 'Article sans nom'
   const category = item.category || 'Général'
 
+  const modelColors = Array.from(
+    new Set(
+      (item.models || [])
+        .flatMap((m: any) => (m.colors || []).map((c: any) => c.name))
+        .filter(Boolean) as string[]
+    )
+  )
+  const colorSizes = Array.from(
+    new Set(
+      (item.models || [])
+        .flatMap((m: any) => (m.colors || []).flatMap((c: any) => (c.sizes || []).map((s: any) => s.name)))
+        .filter(Boolean) as string[]
+    )
+  )
+  const nonStandardModels = Array.from(
+    new Set(
+      (item.models || [])
+        .map((m: any) => (typeof m?.name === 'string' ? m.name.trim() : ''))
+        .filter((n: string) => n && n.toLowerCase() !== 'standard' && n.toLowerCase() !== 'sans') as string[]
+    )
+  )
+  const combinedSizes = colorSizes.length > 0 ? colorSizes : nonStandardModels
+
   return enrichProduct({
     id: `C2-${item._original_id || item.id}`,
     name,
@@ -87,8 +110,8 @@ function transformCatalog2Product(item: any): Product {
     images,
     inStock: item.in_stock ?? true,
     isFeatured: item.is_featured || false,
-    variantColors: Array.from(new Set((item.models || []).flatMap((m: any) => (m.colors || []).map((c: any) => c.name)).filter(Boolean) as string[])).join(', ') || null,
-    variantSizes: Array.from(new Set((item.models || []).flatMap((m: any) => (m.colors || []).flatMap((c: any) => (c.sizes || []).map((s: any) => s.name))).filter(Boolean) as string[])).join(', ') || null,
+    variantColors: modelColors.join(', ') || null,
+    variantSizes: combinedSizes.join(', ') || null,
   })
 }
 
