@@ -7,19 +7,19 @@
   command = "npm run build"
 
 [build.environment]
-  # L'URL du projet Supabase est publique par nature (utilisée dans img-src de la CSP
-  # et dans les URLs d'images de products-snapshot.json). Les clés (SUPABASE_SERVICE_ROLE_KEY,
-  # SUPABASE_ANON_KEY, CASHPAY_*) restent intégralement surveillées par le scanner de secrets.
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,VITE_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_URL"
+  # Les URLs publiques (SUPABASE_URL, CASHPAY_BASE_URL, SITE_URL) figurent dans le code.
+  # Toutes les clés secrètes (SUPABASE_SERVICE_ROLE_KEY, CASHPAY_CLIENT_SECRET, CASHPAY_PASSWORD,
+  # CASHPAY_API_KEY...) restent intégralement surveillées par le scanner de secrets.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,VITE_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_URL,CASHPAY_BASE_URL,SITE_URL,VITE_SITE_URL,NEXT_PUBLIC_SITE_URL"
 
 [dev]
   command = "npm run dev"
   targetPort = 8443
   port = 8888
 
-# ── /api/products : Netlify Edge Function (netlify/edge-functions/products.ts) ──
-# Le chemin est déclaré dans `export const config` de la fonction ; les edge functions
-# s'exécutent avant les redirections, le fallback SPA ci-dessous ne l'intercepte donc pas.
+# ── /api/products & /api/cashpay-proxy : Netlify Edge Functions (netlify/edge-functions/*.ts) ──
+# Les chemins sont déclarés dans `export const config` de chaque fonction ; les edge functions
+# s'exécutent avant les redirections, le fallback SPA ci-dessous ne les intercepte donc pas.
 
 # ── SPA fallback ──
 [[redirects]]

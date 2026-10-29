@@ -57,33 +57,67 @@ react(),
 })
 
 /**
- * API locale (dev uniquement) : sert /api/products avec LE MÊME code que la Netlify Edge Function
- * (netlify/edge-functions/products.ts). Les variables du fichier .env (SUPABASE_URL,
- * SUPABASE_SERVICE_ROLE_KEY...) sont lues ici, côté Node : elles ne sont jamais envoyées au navigateur
- * (seules les variables préfixées VITE_ le sont). En production, c'est Netlify qui exécute la fonction.
+ * API locale (dev uniquement) : sert /api/products et /api/cashpay-proxy avec LE MÊME code
+ * que les Netlify Edge Functions (netlify/edge-functions/*.ts). Les variables du fichier .env
+ * (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CASHPAY_*...) sont lues ici, côté Node :
+ * elles ne sont jamais envoyées au navigateur (seules les variables préfixées VITE_ le sont).
+ * En production, c'est Netlify qui exécute les Edge Functions.
  */
 function gdLocalApiPlugin(): Plugin {
   return {
     name: 'gd-local-api',
     apply: 'serve',
     configureServer(server) {
-      const env = loadEnv(server.config.mode, server.config.root, '')
-      // Simule le global `Netlify` du runtime Deno de Netlify
-      ;(globalThis as any).Netlify = { env: { get: (key: string) => env[key] } }
+      // Simule le global `Netlify` du runtime Deno de Netlify (rechargé à chaque appel pour prendre en compte les modifs de .env)
+      ;(globalThis as any).Netlify = {
+        env: {
+          get: (key: string) => {
+            const env = loadEnv(server.config.mode, server.config.root, '')
+            return env[key] || process.env[key]
+          },
+        },
+      }
 
-      server.middlewares.use('/api/products', async (req, res, next) => {
-        try {
-          const mod = await server.ssrLoadModule('/netlify/edge-functions/products.ts')
-          const method = req.method || 'GET'
-          const request = new Request('http://localhost/api/products', { method })
-          const response: Response = await mod.default(request, { ip: req.socket.remoteAddress })
-          res.statusCode = response.status
-          response.headers.forEach((value, key) => res.setHeader(key, value))
-          res.end(Buffer.from(await response.arrayBuffer()))
-        } catch (err) {
-          next(err as Error)
-        }
-      })
+      const mountEdgeFunction = (routePath: string, modulePath: string) => {
+        server.middlewares.use(routePath, async (req, res, next) => {
+          try {
+            const mod = await server.ssrLoadModule(modulePath)
+            const method = req.method || 'GET'
+            const proto = (req.headers['x-forwarded-proto'] as string) || 'http'
+            const host = req.headers.host || 'localhost:8443'
+            const url = `${proto}://${host}${routePath}`
+
+            const chunks: Buffer[] = []
+            if (method !== 'GET' && method !== 'HEAD') {
+              for await (const chunk of req) {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+              }
+            }
+            const bodyBuf = chunks.length > 0 ? Buffer.concat(chunks) : undefined
+
+            const headers = new Headers()
+            for (const [k, v] of Object.entries(req.headers)) {
+              if (typeof v === 'string') headers.set(k, v)
+              else if (Array.isArray(v)) headers.set(k, v.join(', '))
+            }
+
+            const request = new Request(url, {
+              method,
+              headers,
+              body: bodyBuf && bodyBuf.length > 0 ? bodyBuf : undefined,
+            })
+            const response: Response = await mod.default(request, { ip: req.socket.remoteAddress })
+            res.statusCode = response.status
+            response.headers.forEach((value, key) => res.setHeader(key, value))
+            res.end(Buffer.from(await response.arrayBuffer()))
+          } catch (err) {
+            next(err as Error)
+          }
+        })
+      }
+
+      mountEdgeFunction('/api/products', '/netlify/edge-functions/products.ts')
+      mountEdgeFunction('/api/cashpay-proxy', '/netlify/edge-functions/cashpay-proxy.ts')
     },
   }
 }

@@ -1,53 +1,71 @@
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import MapModal from './MapModal'
 import { formatMoney as money, freeDeliveryThreshold } from './money'
+import { createOrder, getOrderStatus, generateMerchantRef, type CashPayOrderItem } from './cashpay'
+
+export type PendingPaymentInfo = {
+  orderRef: string
+  cashpayRef: string
+  billUrl: string
+  name: string
+  phone: string
+  address: string
+  total?: number
+  _expires?: number
+}
 
 const COUNTRY_CODES = [
-  { value: '+228', label: '🇹🇬 +228' },
-  { value: '+229', label: '🇧🇯 +229' },
-  { value: '+233', label: '🇬🇭 +233' },
-  { value: '+234', label: '🇳🇬 +234' },
-  { value: '+225', label: '🇨🇮 +225' },
-  { value: '+226', label: '🇧🇫 +226' },
-  { value: '+227', label: '🇳🇪 +227' },
-  { value: '+221', label: '🇸🇳 +221' },
-  { value: '+223', label: '🇲🇱 +223' },
-  { value: '+241', label: '🇬🇦 +241' },
-  { value: '+237', label: '🇨🇲 +237' },
-  { value: '+242', label: '🇨🇬 +242' },
-  { value: '+243', label: '🇨🇩 +243' },
-  { value: '+250', label: '🇷🇼 +250' },
-  { value: '+33', label: '🇫🇷 +33' },
-  { value: '+32', label: '🇧🇪 +32' },
-  { value: '+41', label: '🇨🇭 +41' },
-  { value: '+49', label: '🇩🇪 +49' },
-  { value: '+44', label: '🇬🇧 +44' },
-  { value: '+1', label: '🇺🇸 +1' },
-  { value: '+86', label: '🇨🇳 +86' },
-  { value: '+91', label: '🇮🇳 +91' },
-  { value: '+212', label: '🇲🇦 +212' },
-  { value: '+216', label: '🇹🇳 +216' },
-  { value: '+90', label: '🇹🇷 +90' },
-  { value: '+966', label: '🇸🇦 +966' },
-  { value: '+971', label: '🇦🇪 +971' },
-  { value: '+55', label: '🇧🇷 +55' },
-  { value: '+81', label: '🇯🇵 +81' },
+  { value: '+228', label: '🇹🇬 +228', country: 'Togo', defaultCity: 'Lomé' },
+  { value: '+229', label: '🇧🇯 +229', country: 'Bénin', defaultCity: 'Cotonou' },
+  { value: '+233', label: '🇬🇭 +233', country: 'Ghana', defaultCity: 'Accra' },
+  { value: '+234', label: '🇳🇬 +234', country: 'Nigéria', defaultCity: 'Lagos' },
+  { value: '+225', label: '🇨🇮 +225', country: "Côte d'Ivoire", defaultCity: 'Abidjan' },
+  { value: '+226', label: '🇧🇫 +226', country: 'Burkina Faso', defaultCity: 'Ouagadougou' },
+  { value: '+227', label: '🇳🇪 +227', country: 'Niger', defaultCity: 'Niamey' },
+  { value: '+221', label: '🇸🇳 +221', country: 'Sénégal', defaultCity: 'Dakar' },
+  { value: '+223', label: '🇲🇱 +223', country: 'Mali', defaultCity: 'Bamako' },
+  { value: '+241', label: '🇬🇦 +241', country: 'Gabon', defaultCity: 'Libreville' },
+  { value: '+237', label: '🇨🇲 +237', country: 'Cameroun', defaultCity: 'Douala' },
+  { value: '+242', label: '🇨🇬 +242', country: 'Congo', defaultCity: 'Brazzaville' },
+  { value: '+243', label: '🇨🇩 +243', country: 'RD Congo', defaultCity: 'Kinshasa' },
+  { value: '+250', label: '🇷🇼 +250', country: 'Rwanda', defaultCity: 'Kigali' },
+  { value: '+33', label: '🇫🇷 +33', country: 'France', defaultCity: 'Paris' },
+  { value: '+32', label: '🇧🇪 +32', country: 'Belgique', defaultCity: 'Bruxelles' },
+  { value: '+41', label: '🇨🇭 +41', country: 'Suisse', defaultCity: 'Genève' },
+  { value: '+49', label: '🇩🇪 +49', country: 'Allemagne', defaultCity: 'Berlin' },
+  { value: '+44', label: '🇬🇧 +44', country: 'Royaume-Uni', defaultCity: 'Londres' },
+  { value: '+1', label: '🇺🇸 +1', country: 'États-Unis', defaultCity: 'New York' },
+  { value: '+86', label: '🇨🇳 +86', country: 'Chine', defaultCity: 'Pékin' },
+  { value: '+91', label: '🇮🇳 +91', country: 'Inde', defaultCity: 'New Delhi' },
+  { value: '+212', label: '🇲🇦 +212', country: 'Maroc', defaultCity: 'Casablanca' },
+  { value: '+216', label: '🇹🇳 +216', country: 'Tunisie', defaultCity: 'Tunis' },
+  { value: '+90', label: '🇹🇷 +90', country: 'Turquie', defaultCity: 'Istanbul' },
+  { value: '+966', label: '🇸🇦 +966', country: 'Arabie Saoudite', defaultCity: 'Riyad' },
+  { value: '+971', label: '🇦🇪 +971', country: 'Émirats Arabes Unis', defaultCity: 'Dubaï' },
+  { value: '+55', label: '🇧🇷 +55', country: 'Brésil', defaultCity: 'São Paulo' },
+  { value: '+81', label: '🇯🇵 +81', country: 'Japon', defaultCity: 'Tokyo' },
 ]
 
 export default function Checkout({
   subtotal,
+  items = [],
+  initialPendingOrder = null,
   onBack,
+  onClearCart,
   onOpenLegal,
 }: {
   subtotal: number
+  items?: CashPayOrderItem[]
+  initialPendingOrder?: PendingPaymentInfo | null
   onBack: () => void
+  onClearCart?: () => void
   onOpenLegal?: (view: 'privacy' | 'cgv') => void
 }) {
-  const [step, setStep] = useState(1)
-  const [clientName, setClientName] = useState('')
+  const [step, setStep] = useState(initialPendingOrder ? 3 : 1)
+  const [clientName, setClientName] = useState(initialPendingOrder?.name || '')
   const [phoneCountryCode, setPhoneCountryCode] = useState('+228')
   const [clientPhone, setClientPhone] = useState('')
-  const [clientAddress, setClientAddress] = useState('')
+  const [clientAddress, setClientAddress] = useState(initialPendingOrder?.address || '')
   const [mapOpen, setMapOpen] = useState(false)
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
@@ -56,6 +74,13 @@ export default function Checkout({
   const [legalWarning, setLegalWarning] = useState(false)
   const [outOfZoneWarning, setOutOfZoneWarning] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadingLabel, setLoadingLabel] = useState("Validation en cours…")
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // État de la commande CashPay (étape 3 / retour de paiement)
+  const [orderInfo, setOrderInfo] = useState<PendingPaymentInfo | null>(initialPendingOrder)
+  const [checkingPayment, setCheckingPayment] = useState(Boolean(initialPendingOrder))
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
 
   const handleMapConfirm = (lat: number, lng: number, addr: string, distKm: number) => {
     setDeliveryCoords({ lat, lng })
@@ -104,8 +129,67 @@ export default function Checkout({
   const operatorFee = subtotal === 0 ? 0 : Math.round((subtotal + deliveryFee) * 0.015)
   const total = subtotal === 0 ? 0 : subtotal + deliveryFee + operatorFee
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  // Vérification du statut de paiement auprès de CashPay & Supabase
+  const verifyPaymentStatus = useCallback(
+    async (info: PendingPaymentInfo, showLoader = false): Promise<boolean> => {
+      if (!info.cashpayRef && !info.orderRef) return false
+      if (showLoader) setCheckingPayment(true)
+      try {
+        const result = await getOrderStatus(info.cashpayRef || info.orderRef, info.orderRef)
+        const obj = result?.order || result || {}
+        const st = String(obj.status || obj.payment_status || obj.state || '').toLowerCase()
+        const isPaid =
+          result?.paid === true ||
+          ['paid', 'completed', 'success', 'approved', 'validated', 'confirmed', 'excess', '1', 'true'].includes(st)
+
+        if (isPaid) {
+          setPaymentConfirmed(true)
+          try {
+            localStorage.removeItem('pendingPayment')
+            sessionStorage.removeItem('gds_cart_pending')
+          } catch {}
+          onClearCart?.()
+          return true
+        }
+      } catch {
+        // Ignorer silencieusement pendant le polling
+      } finally {
+        if (showLoader) setCheckingPayment(false)
+      }
+      return false
+    },
+    [onClearCart]
+  )
+
+  // Polling automatique lorsque l'utilisateur revient de CashPay (étape 3)
+  useEffect(() => {
+    if (step !== 3 || !orderInfo || paymentConfirmed) return
+
+    let cancelled = false
+    let attempts = 0
+    let timer: number | null = null
+
+    const runCheck = async (firstRun: boolean) => {
+      if (cancelled) return
+      const paid = await verifyPaymentStatus(orderInfo, firstRun)
+      if (!paid && !cancelled && attempts < 15) {
+        attempts++
+        timer = window.setTimeout(() => runCheck(false), 3500)
+      }
+    }
+
+    runCheck(true)
+
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [step, orderInfo, paymentConfirmed, verifyPaymentStatus])
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
+
     if (!agreeLegal) {
       setLegalWarning(true)
       return
@@ -118,18 +202,112 @@ export default function Checkout({
     }
     setOutOfZoneWarning(false)
 
+    // Normalisation du téléphone
+    const rawDigits = clientPhone.replace(/[\s\-().]/g, '').replace(/^0+/, '')
+    if (!/^\d{6,15}$/.test(rawDigits)) {
+      setSubmitError('Veuillez saisir un numéro de téléphone valide (chiffres uniquement).')
+      return
+    }
+    const fullPhone = `${phoneCountryCode}${rawDigits}`
+
+    // Séparation nom / prénom
+    const nameParts = clientName.trim().split(/\s+/)
+    const firstname = nameParts[0] || 'Client'
+    const lastname = nameParts.slice(1).join(' ') || ''
+
+    const countryMeta = COUNTRY_CODES.find(c => c.value === phoneCountryCode)
+    const countryName = countryMeta?.country || 'Togo'
+    const cityName = countryMeta?.defaultCity || 'Lomé'
+
     setLoading(true)
-    setTimeout(() => {
+    setLoadingLabel('Génération de la facture CashPay…')
+
+    try {
+      const merchantRef = generateMerchantRef()
+      const itemsDesc =
+        items.length > 0
+          ? items.map(i => `${i.name} x${i.quantity}`).join(', ')
+          : "Articles GoodDoctor's Shop"
+      const description = `Commande GoodDoctor's Shop: ${itemsDesc}`.substring(0, 200)
+
+      const cashpayResponse = await createOrder({
+        amount: total,
+        phone: fullPhone,
+        firstname,
+        lastname,
+        address: clientAddress.trim(),
+        city: cityName,
+        country: countryName,
+        merchantRef,
+        description,
+        items,
+        deliveryCoords,
+        deliveryFee,
+      })
+
+      const billUrl = String(cashpayResponse?.bill_url || '').trim()
+      const cashpayRef = String(cashpayResponse?.order_reference || merchantRef).trim()
+
+      const pendingData: PendingPaymentInfo = {
+        orderRef: merchantRef,
+        cashpayRef,
+        billUrl,
+        name: clientName.trim(),
+        phone: fullPhone,
+        address: clientAddress.trim(),
+        total,
+        _expires: Date.now() + 3600_000,
+      }
+
+      setOrderInfo(pendingData)
+
+      try {
+        localStorage.setItem('pendingPayment', JSON.stringify(pendingData))
+      } catch {}
+
+      // Rediriger vers le portail de paiement sécurisé CashPay
+      if (billUrl && billUrl.startsWith('https://')) {
+        setLoadingLabel('Redirection vers CashPay…')
+        window.location.href = billUrl
+        return
+      }
+
+      // Si pas d'URL de redirection (paiement direct), afficher l'écran de confirmation
       setLoading(false)
       setStep(3)
-    }, 700)
+    } catch (error: any) {
+      setLoading(false)
+      setLoadingLabel("Confirmer l'achat")
+
+      let errorMsg = 'Erreur lors de la connexion à CashPay. Veuillez réessayer.'
+      if (error?.status === 409) {
+        errorMsg = 'Cette commande a déjà été envoyée. Actualisez la page.'
+      } else if (error?.status === 429) {
+        errorMsg = 'Trop de tentatives. Patientez 1 minute avant de réessayer.'
+      } else if (error?.status === 408 || error?.name === 'AbortError') {
+        errorMsg = 'Le serveur de paiement met trop de temps à répondre. Vérifiez votre connexion.'
+      } else if (error?.message && !String(error.message).includes('fetch')) {
+        errorMsg = String(error.message)
+      } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        errorMsg = 'Pas de connexion internet. Vérifiez votre réseau.'
+      }
+      setSubmitError(errorMsg)
+    }
   }
 
   return (
     <div className="checkout">
       <button className="text-link" onClick={onBack}>← Retour au panier</button>
       <div className="eyebrow">COMMANDE &amp; LIVRAISON</div>
-      <h2>{step === 3 ? 'Commande transmise !' : 'Finaliser votre commande'}</h2>
+      <h2>
+        {step === 3
+          ? paymentConfirmed
+            ? 'Commande Validée !'
+            : checkingPayment
+            ? 'Vérification du paiement…'
+            : 'En attente de paiement'
+          : 'Finaliser votre commande'}
+      </h2>
 
       {step === 1 && (
         <form id="checkout-form" onSubmit={handleFormSubmit}>
@@ -419,6 +597,26 @@ export default function Checkout({
               <p>Moov Money · Mixx · Coris Money · Carte bancaire (Visa, Mastercard)</p>
             </div>
 
+            {/* Message d'erreur CashPay éventuel */}
+            {submitError && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: '12px',
+                  padding: '11px 14px',
+                  borderRadius: '10px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  lineHeight: 1.45,
+                }}
+              >
+                {submitError}
+              </div>
+            )}
+
             {/* Bouton Confirmer l'achat */}
             <button
               id="checkout-submit-btn"
@@ -427,7 +625,7 @@ export default function Checkout({
               className="ecom-confirm-btn"
               disabled={loading}
             >
-              <span>{loading ? 'Validation en cours…' : "Confirmer l'achat"}</span>
+              <span>{loading ? loadingLabel : "Confirmer l'achat"}</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" />
                 <polyline points="12 5 19 12 12 19" />
@@ -447,9 +645,103 @@ export default function Checkout({
 
       {step === 3 && (
         <div className="checkout-result">
-          <h3>Votre commande a été transmise !</h3>
-          <p>Un e-mail de confirmation vous a été envoyé avec le suivi en direct de votre livraison.</p>
-          <button className="primary" onClick={onBack}>Revenir à ma sélection</button>
+          {orderInfo?.orderRef && (
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px',
+                textAlign: 'center',
+              }}
+            >
+              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1.2px', color: '#64748b', fontWeight: 700 }}>
+                Référence commande
+              </span>
+              <p style={{ fontSize: '16px', fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', margin: '4px 0 0' }}>
+                {orderInfo.orderRef}
+              </p>
+            </div>
+          )}
+
+          {paymentConfirmed ? (
+            <>
+              <h3>Merci {orderInfo?.name || clientName} ! Votre paiement est confirmé.</h3>
+              <p>
+                Votre commande a été enregistrée et payée avec succès via CashPay. Notre équipe prépare vos articles pour l'expédition.
+              </p>
+              <button className="primary" onClick={onBack}>
+                Retour à la boutique
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>
+                {checkingPayment
+                  ? 'Confirmation de votre règlement auprès de CashPay…'
+                  : 'Votre commande est enregistrée.'}
+              </h3>
+              <p>
+                {checkingPayment
+                  ? 'Un instant, nous vérifions le statut de votre transaction.'
+                  : 'Veuillez finaliser le règlement sur CashPay pour déclencher la préparation de votre commande.'}
+              </p>
+
+              <div
+                style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '18px',
+                  fontSize: '12px',
+                  color: '#92400e',
+                  lineHeight: 1.5,
+                }}
+              >
+                Si vous avez déjà validé le paiement sur votre téléphone, patientez quelques instants.{' '}
+                <strong>Ne payez pas à nouveau</strong> pour éviter un double débit.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {orderInfo?.billUrl && orderInfo.billUrl.startsWith('https://') && (
+                  <a
+                    href={orderInfo.billUrl}
+                    className="ecom-confirm-btn"
+                    style={{ textDecoration: 'none', textAlign: 'center', justifyContent: 'center' }}
+                  >
+                    <span>Payer maintenant sur CashPay</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </a>
+                )}
+
+                {orderInfo && (
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={checkingPayment}
+                    onClick={() => verifyPaymentStatus(orderInfo, true)}
+                    style={{ width: '100%' }}
+                  >
+                    {checkingPayment ? 'Vérification en cours…' : "J'ai payé · Vérifier mon statut"}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={onBack}
+                  style={{ alignSelf: 'center', marginTop: '6px' }}
+                >
+                  Retour à la boutique
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

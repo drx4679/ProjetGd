@@ -5,7 +5,7 @@ import About from './About'
 import Privacy from './Privacy'
 import Cgv from './Cgv'
 import ModalShell from './ModalShell'
-import Checkout from './Checkout'
+import Checkout, { type PendingPaymentInfo } from './Checkout'
 import { formatMoney } from './money'
 import { useProducts, type Product } from './useProducts'
 
@@ -157,7 +157,21 @@ export default function App() {
     try { localStorage.setItem('gd_favorites', JSON.stringify(favorites)) } catch {}
   }, [favorites])
 
-  const [cart, setCart] = useState<CartItem[]>([])
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedCart = localStorage.getItem('gd_cart')
+      return savedCart ? JSON.parse(savedCart) : []
+    } catch {
+      return []
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('gd_cart', JSON.stringify(cart))
+    } catch {}
+  }, [cart])
+
+  const [pendingOrder, setPendingOrder] = useState<PendingPaymentInfo | null>(null)
 
   // ── RESTAURATION ET SAUVEGARDE DE LA POSITION AU RECHARGEMENT DU SITE ──
   const restoredScrollRef = useRef(false)
@@ -492,6 +506,44 @@ export default function App() {
       })
     }
   }, [panel])
+
+  // Détection du retour depuis le portail de paiement CashPay (/success ou bfcache)
+  useEffect(() => {
+    const checkReturnFromCashPay = (fromBfCache = false) => {
+      try {
+        const raw = localStorage.getItem('pendingPayment')
+        if (!raw) return
+        const parsed = JSON.parse(raw) as PendingPaymentInfo
+        if (parsed._expires && Date.now() > parsed._expires) {
+          localStorage.removeItem('pendingPayment')
+          return
+        }
+        const path = window.location.pathname.replace(/\/+$/, '')
+        const isSuccessRoute = path === '/success' || window.location.hash === '#success'
+        if (isSuccessRoute || fromBfCache) {
+          setPendingOrder(parsed)
+          setPanel('checkout')
+          if (path === '/success') {
+            window.history.replaceState({}, '', '/')
+          }
+        }
+      } catch {
+        try {
+          localStorage.removeItem('pendingPayment')
+        } catch {}
+      }
+    }
+
+    checkReturnFromCashPay(false)
+
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        checkReturnFromCashPay(true)
+      }
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   const subtotal = cart.reduce((sum, item) => {
     const p = products.find(p => p.id === item.productId)
@@ -1149,12 +1201,45 @@ export default function App() {
       document.body
     )}
 
-    {panel === 'checkout' && cart.length > 0 && <ModalShell label="Paiement" onClose={() => setPanel('cart')}><Checkout subtotal={subtotal} onBack={() => setPanel('cart')} onOpenLegal={(view) => { setPanel(''); navigateToView(view); }} /></ModalShell>}
+    {panel === 'checkout' && (cart.length > 0 || pendingOrder) && (
+      <ModalShell
+        label="Paiement"
+        onClose={() => {
+          setPendingOrder(null)
+          setPanel(cart.length > 0 ? 'cart' : '')
+        }}
+      >
+        <Checkout
+          subtotal={subtotal}
+          items={cart.map(item => {
+            const p = products.find(pr => pr.id === item.productId)
+            return {
+              id: item.productId,
+              name: p?.name || 'Article',
+              quantity: item.quantity,
+              price: p?.price || 0,
+              selectedColor: item.color || null,
+              selectedSize: item.size || null,
+            }
+          })}
+          initialPendingOrder={pendingOrder}
+          onClearCart={() => setCart([])}
+          onBack={() => {
+            setPendingOrder(null)
+            setPanel(cart.length > 0 ? 'cart' : '')
+          }}
+          onOpenLegal={(view) => {
+            setPanel('')
+            navigateToView(view)
+          }}
+        />
+      </ModalShell>
+    )}
     {panel === 'cart' && <ModalShell label="Votre panier" onClose={() => setPanel('')}><div className="drawer-heading"><h2>Votre panier ({cart.reduce((sum, item) => sum + item.quantity, 0)})</h2><button onClick={() => setPanel('')} aria-label="Fermer">×</button></div>{cart.length ? <>{cart.map((item, i) => {
       const p = products.find(p => p.id === item.productId)
       if (!p) return null
       return <div className="cart-item" key={i}><img src={p.images[0]?.url || placeholder} alt={p.name}/><div className="cart-item-content"><b>{p.name}</b><p>{formatMoney(p.price)} / pièce</p><div className="variant-fields"><label>Taille/Format<select aria-label={`Format de ${p.name}, article ${i + 1}`} value={item.size} onChange={e => updateCartItem(i, { size: e.target.value })}>{(p.sizesList.length > 0 ? p.sizesList : ['Unique']).map(size => <option key={size}>{size}</option>)}</select></label><label>Couleur<select aria-label={`Couleur de ${p.name}, article ${i + 1}`} value={item.color} onChange={e => updateCartItem(i, { color: e.target.value })}>{(p.colorsList.length > 0 ? p.colorsList : ['Standard']).map(color => <option key={color}>{color}</option>)}</select></label></div><div className="cart-item-bottom"><div className="quantity-control"><button aria-label={`Diminuer la quantité de ${p.name}`} disabled={item.quantity === 1} onClick={() => updateCartItem(i, { quantity: item.quantity - 1 })}>−</button><output aria-live="polite">{item.quantity}</output><button aria-label={`Augmenter la quantité de ${p.name}`} disabled={item.quantity === 99} onClick={() => updateCartItem(i, { quantity: item.quantity + 1 })}>+</button></div><button onClick={() => setCart(items => items.filter((_, j) => j !== i))}>Retirer</button><b>{formatMoney(p.price * item.quantity)}</b></div><div className="variant-actions"><button className={item.confirmed ? 'variant-confirmed' : 'variant-confirm'} onClick={() => updateCartItem(i, { confirmed: !item.confirmed })}>{item.confirmed ? 'Sélection validée · Modifier' : 'Valider cette sélection'}</button>{item.confirmed && <button className="variant-add" onClick={() => setCart(items => [...items, { ...item, quantity: 1, confirmed: false }])}>+ Ajouter une autre variante</button>}<span className="variant-summary" role="status">{item.confirmed ? `${item.color} · ${item.size} · Quantité : ${item.quantity}` : 'Choisissez le format, la couleur et la quantité, puis validez.'}</span></div></div></div>
-    })}<div className="total"><b>{cart.some(item => !item.confirmed) ? 'Total provisoire' : 'Total validé'}</b><b>{formatMoney(subtotal)}</b></div><button className="primary checkout-button" disabled={cart.some(item => !item.confirmed)} onClick={() => setPanel('checkout')}>Continuer vers le paiement</button><p className="demo-note">{cart.some(item => !item.confirmed) ? 'Certaines sélections restent à valider.' : 'Toutes vos variantes sont validées.'}</p></> : <p className="empty">Votre panier est vide. Découvrez nos uniformes, dispositifs et accessoires médicaux.</p>}<button className="primary" onClick={() => { setPanel(''); go() }}>Continuer mes achats <Icon name="arrow"/></button></ModalShell>}
+    })}<div className="total"><b>{cart.some(item => !item.confirmed) ? 'Total provisoire' : 'Total validé'}</b><b>{formatMoney(subtotal)}</b></div><button className="primary checkout-button" disabled={cart.some(item => !item.confirmed)} onClick={() => { setPendingOrder(null); setPanel('checkout'); }}>Continuer vers le paiement</button><p className="demo-note">{cart.some(item => !item.confirmed) ? 'Certaines sélections restent à valider.' : 'Toutes vos variantes sont validées.'}</p></> : <p className="empty">Votre panier est vide. Découvrez nos uniformes, dispositifs et accessoires médicaux.</p>}<button className="primary" onClick={() => { setPanel(''); go() }}>Continuer mes achats <Icon name="arrow"/></button></ModalShell>}
     {toastMessage && (
       <div className="share-toast" role="status" aria-live="polite">
         <Icon name="share" size={16} />
