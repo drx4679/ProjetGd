@@ -17,7 +17,6 @@ import type { Config, Context } from "https://edge.netlify.com"
 
 export const config: Config = {
   path: "/api/products",
-  method: "GET",
 }
 
 const rateMap = new Map<string, { start: number; count: number }>()
@@ -58,8 +57,7 @@ async function callRpc(url: string, key: string, fn: string): Promise<unknown[]>
 function sanitizeCatalog2Item(item: any) {
   if (!item || typeof item !== "object") return null
   return {
-    id: item.id,
-    _original_id: item._original_id,
+    id: item._original_id || item.id,
     name: item.name || "",
     description: item.description || "",
     price: item.price || 0,

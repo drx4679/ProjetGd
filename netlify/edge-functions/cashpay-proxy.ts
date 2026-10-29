@@ -13,7 +13,6 @@ import type { Config, Context } from "https://edge.netlify.com"
 
 export const config: Config = {
   path: "/api/cashpay-proxy",
-  method: ["POST", "OPTIONS"],
 }
 
 // Cache du token OAuth2 CashPay en mémoire de l'instance Edge
@@ -194,8 +193,38 @@ export default async (req: Request, context: Context) => {
     })
   }
 
+  // Vérification CSRF / Origin : bloque les appels POST depuis un site tiers
+  const originHeader = (req.headers.get("origin") || "").replace(/\/+$/, "")
+  if (originHeader) {
+    const isAllowedOrigin =
+      originHeader === reqOrigin ||
+      originHeader === configuredSiteUrl ||
+      /^https:\/\/[a-z0-9-]+--wegd\.netlify\.app$/i.test(originHeader) ||
+      originHeader === "https://wegd.netlify.app" ||
+      /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(originHeader)
+    if (!isAllowedOrigin) {
+      return new Response(JSON.stringify({ error: "Origin non autorisée" }), {
+        status: 403,
+        headers: secHeaders,
+      })
+    }
+  }
+
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+    if (rawBody.length > 65536) {
+      return new Response(JSON.stringify({ error: "Payload trop volumineux" }), {
+        status: 413,
+        headers: secHeaders,
+      })
+    }
+    if (/"(__proto__|constructor|prototype)"\s*:/.test(rawBody)) {
+      return new Response(JSON.stringify({ error: "Requête invalide" }), {
+        status: 400,
+        headers: secHeaders,
+      })
+    }
+    const body = rawBody ? JSON.parse(rawBody) : {}
     const { action, payload, orderReference, merchantRef: statusMerchantRef } = body || {}
     const baseUrl = (getEnv("CASHPAY_BASE_URL") || "https://api.semoa-payments.ovh/prod").replace(/\/+$/, "")
     const supabaseUrl = (getEnv("SUPABASE_URL") || getEnv("VITE_SUPABASE_URL") || "").replace(/\/+$/, "")
