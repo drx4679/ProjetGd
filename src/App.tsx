@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef, useDeferredValue } from 'react'
 import { createPortal } from 'react-dom'
 import OrderTracking from './OrderTracking'
 import About from './About'
@@ -472,6 +472,9 @@ export default function App() {
 
   const [panel, setPanel] = useState('')
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const hasScrolledSearchRef = useRef(false)
   const [subscribed, setSubscribed] = useState(false)
   const [catalog, setCatalog] = useState(false)
   const [sort, setSort] = useState('featured')
@@ -479,19 +482,36 @@ export default function App() {
 
   useEffect(() => {
     setVisibleCount(5)
-  }, [filter, search, panel, sort, catalog])
+  }, [filter, deferredSearch, panel, sort, catalog])
+
+  useEffect(() => {
+    if (panel === 'search') {
+      hasScrolledSearchRef.current = false
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus({ preventScroll: true })
+      })
+    }
+  }, [panel])
 
   const subtotal = cart.reduce((sum, item) => {
     const p = products.find(p => p.id === item.productId)
     return sum + (p ? p.price * item.quantity : 0)
   }, 0)
 
+  const scrollToSelection = useCallback(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('selection')?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      })
+    })
+  }, [])
+
   const go = (category = 'Tout') => {
     setFilter(category)
     if (currentView !== 'home') {
       navigateToView('home')
     }
-    requestAnimationFrame(() => document.getElementById('selection')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
+    scrollToSelection()
   }
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -529,11 +549,23 @@ export default function App() {
   }, [showToast])
 
   const shown = useMemo(() => {
+    const normalize = (str: string) =>
+      str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const q = normalize(deferredSearch.trim())
     return products
       .filter(p => p.price > 0)
-      .filter(p => (filter === 'Tout' || p.category === filter) && p.name.toLowerCase().includes(search.toLowerCase()) && (panel !== 'favorites' || favorites.includes(p.id)))
+      .filter(p => {
+        const matchesCat = filter === 'Tout' || p.category === filter
+        const matchesQuery =
+          !q ||
+          normalize(p.name).includes(q) ||
+          normalize(p.category).includes(q) ||
+          normalize(p.detail || '').includes(q)
+        const matchesFav = panel !== 'favorites' || favorites.includes(p.id)
+        return matchesCat && matchesQuery && matchesFav
+      })
       .sort((a, b) => sort === 'ascending' ? a.price - b.price : sort === 'descending' ? b.price - a.price : (a.isFeatured === b.isFeatured ? 0 : a.isFeatured ? -1 : 1))
-  }, [products, filter, search, panel, favorites, sort])
+  }, [products, filter, deferredSearch, panel, favorites, sort])
 
   const filterCategories = useMemo(() => {
     return categories.filter(c => c === 'Tout' || products.some(p => p.category === c && p.price > 0))
@@ -575,7 +607,15 @@ export default function App() {
         </button>
       </nav>
       <div className="header-actions">
-        <button aria-label="Rechercher" className="header-search-btn" onClick={() => setPanel(panel === 'search' ? '' : 'search')}><Icon name="search"/></button>
+        <button
+          type="button"
+          aria-label="Rechercher"
+          aria-expanded={panel === 'search'}
+          className={`header-search-btn ${panel === 'search' ? 'active' : ''}`}
+          onClick={() => setPanel(panel === 'search' ? '' : 'search')}
+        >
+          <Icon name="search"/>
+        </button>
         <button
           type="button"
           aria-label={favorites.length > 0 ? `Favoris (${favorites.length})` : "Favoris"}
@@ -590,7 +630,94 @@ export default function App() {
         <button aria-label="Ouvrir le panier" className="cart-button" onClick={() => setPanel('cart')}><Icon name="bag"/><span>{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></button>
       </div>
     </header>
-    {panel === 'search' && <div className="searchbar"><input maxLength={120} autoFocus placeholder="Rechercher un uniforme, un dispositif, un accessoire…" value={search} onChange={e => { setSearch(e.target.value); go() }}/><button onClick={() => { setSearch(''); setPanel('') }}>Fermer ×</button></div>}
+    {panel === 'search' && (
+      <div className="searchbar" role="search">
+        <div className="searchbar-field">
+          <span className="searchbar-icon" aria-hidden="true">
+            <Icon name="search" size={17} />
+          </span>
+          <input
+            ref={searchInputRef}
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            maxLength={120}
+            placeholder="Rechercher un uniforme, un dispositif, un accessoire…"
+            value={search}
+            onChange={e => {
+              const val = e.target.value
+              setSearch(val)
+              if (currentView !== 'home') {
+                navigateToView('home')
+              }
+              if (val.trim().length > 0 && filter !== 'Tout') {
+                setFilter('Tout')
+              }
+              if (val.trim().length > 0 && !hasScrolledSearchRef.current) {
+                hasScrolledSearchRef.current = true
+                const sel = document.getElementById('selection')
+                if (sel) {
+                  const rect = sel.getBoundingClientRect()
+                  if (rect.top > window.innerHeight * 0.55 || rect.bottom < 0) {
+                    scrollToSelection()
+                  }
+                }
+              }
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+                scrollToSelection()
+              } else if (e.key === 'Escape') {
+                setSearch('')
+                setPanel('')
+              }
+            }}
+          />
+          {search.trim().length > 0 && (
+            <button
+              type="button"
+              className="searchbar-count"
+              onClick={() => {
+                searchInputRef.current?.blur()
+                scrollToSelection()
+              }}
+              title="Voir les résultats"
+            >
+              {shown.length} résultat{shown.length > 1 ? 's' : ''}
+            </button>
+          )}
+          {search.length > 0 && (
+            <button
+              type="button"
+              className="searchbar-clear"
+              aria-label="Effacer la recherche"
+              onClick={() => {
+                setSearch('')
+                searchInputRef.current?.focus({ preventScroll: true })
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          className="searchbar-close"
+          onClick={() => {
+            setSearch('')
+            setPanel('')
+          }}
+        >
+          Fermer
+        </button>
+      </div>
+    )}
     </div>
     <main id="main-content" tabIndex={-1}>
       {currentView === 'tracking' && <OrderTracking />}

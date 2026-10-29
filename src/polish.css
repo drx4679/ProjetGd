@@ -1324,5 +1324,204 @@
   transform: none;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   BARRE DE RECHERCHE FLUIDE & ERGONOMIE MOBILE (ANTI-ZOOM AUTO)
+   ══════════════════════════════════════════════════════════════════════════ */
+@keyframes searchbar-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header-search-btn.active {
+  background: #e0f2fa;
+  color: var(--color-accent, #087fb5);
+}
+
+.searchbar {
+  padding: 12px 5%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f3f5f7;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  animation: searchbar-slide-down 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.searchbar-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 10px 0 12px;
+  min-height: 44px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchbar-field:focus-within {
+  border-color: var(--color-accent, #087fb5);
+  box-shadow: 0 0 0 3px rgba(8, 127, 181, 0.14);
+}
+
+.searchbar-icon {
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.searchbar input {
+  flex: 1;
+  min-width: 0;
+  border: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 9px 2px !important;
+  /* >= 16px empêche systématiquement le zoom automatique sur iOS Safari & Chrome Mobile */
+  font-size: 16px !important;
+  line-height: 1.35;
+  color: var(--color-ink, #242722);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.searchbar input::placeholder {
+  color: #94a3b8;
+  font-size: 14.5px;
+}
+
+.searchbar input::-webkit-search-cancel-button,
+.searchbar input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.searchbar-count {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #e0f2fa;
+  color: #0369a1;
+  font-size: 11px !important;
+  font-weight: 700;
+  border: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.searchbar-count:active {
+  transform: scale(0.96);
+}
+
+.searchbar-clear {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  border: 0;
+  font-size: 11px !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.searchbar-clear:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.searchbar-clear:active {
+  transform: scale(0.92);
+}
+
+.searchbar-close {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px !important;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  white-space: nowrap;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.searchbar-close:hover {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+/* ── Désactivation globale du zoom automatique sur mobile pour tous les champs ── */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .searchbar input,
+  .map-search-input,
+  .ecom-input-underline,
+  .ecom-phone-select,
+  .newsletter input,
+  .variant-fields select,
+  .catalog-toolbar select,
+  .checkout-form input,
+  .checkout-form select {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Fluidité & Ergonomie Mobile (filtres horizontaux fluides, retour tactile) ── */
+@media (max-width: 600px) {
+  .searchbar {
+    padding: 10px 4%;
+    gap: 8px;
+  }
+  .searchbar-close {
+    padding: 8px 11px;
+    font-size: 12px !important;
+  }
+  .selection .filters {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+    margin-inline: -5%;
+    padding-inline: 5%;
+  }
+  .selection .filters::-webkit-scrollbar {
+    display: none;
+  }
+  .selection .filters button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+}
+
+
 
 
