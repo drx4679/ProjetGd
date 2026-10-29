@@ -560,7 +560,7 @@ export default function App() {
           !q ||
           normalize(p.name).includes(q) ||
           normalize(p.category).includes(q) ||
-          normalize(p.detail || '').includes(q)
+          normalize(p.description || '').includes(q)
         const matchesFav = panel !== 'favorites' || favorites.includes(p.id)
         return matchesCat && matchesQuery && matchesFav
       })
