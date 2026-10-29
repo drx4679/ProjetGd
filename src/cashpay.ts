@@ -3,6 +3,8 @@
 // Aucun secret n'est stocké côté client.
 // ============================================================
 
+import { getJweRequestHeaders, parseAndDecryptJwe } from './jweClient'
+
 const PROXY_URL = '/api/cashpay-proxy'
 
 export type CashPayOrderItem = {
@@ -95,9 +97,10 @@ export async function createOrder({
 
   const timeout = createTimeout(20000)
   try {
+    const headers = await getJweRequestHeaders({ 'Content-Type': 'application/json' })
     const response = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ action: 'create_order', payload: orderPayload }),
       signal: timeout.signal,
     })
@@ -109,7 +112,8 @@ export async function createOrder({
       throw err
     }
 
-    return await response.json()
+    const raw = await response.json()
+    return await parseAndDecryptJwe<CashPayOrderResponse>(raw)
   } catch (e: any) {
     if (e?.name === 'AbortError') {
       const err = new Error('Le serveur ne répond pas. Vérifiez votre connexion et réessayez.') as Error & {
@@ -130,9 +134,10 @@ export async function createOrder({
 export async function getOrderStatus(orderReference: string, merchantRef?: string): Promise<any> {
   const timeout = createTimeout(15000)
   try {
+    const headers = await getJweRequestHeaders({ 'Content-Type': 'application/json' })
     const response = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         action: 'check_status',
         orderReference,
@@ -146,7 +151,8 @@ export async function getOrderStatus(orderReference: string, merchantRef?: strin
       throw new Error(errMsg)
     }
 
-    return await response.json()
+    const raw = await response.json()
+    return await parseAndDecryptJwe<any>(raw)
   } catch (e: any) {
     if (e?.name === 'AbortError') {
       throw new Error('Vérification expirée — le serveur ne répond pas')
@@ -205,9 +211,10 @@ export type TrackedOrder = {
 export async function trackOrders(phone: string, orderRef?: string): Promise<TrackedOrder[]> {
   const timeout = createTimeout(15000)
   try {
+    const headers = await getJweRequestHeaders({ 'Content-Type': 'application/json' })
     const response = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         action: 'track_orders',
         phone: phone.trim(),
@@ -221,7 +228,8 @@ export async function trackOrders(phone: string, orderRef?: string): Promise<Tra
       throw new Error(errMsg)
     }
 
-    const data = await response.json()
+    const raw = await response.json()
+    const data = await parseAndDecryptJwe<{ orders?: TrackedOrder[] }>(raw)
     return Array.isArray(data?.orders) ? data.orders : []
   } catch (e: any) {
     if (e?.name === 'AbortError') {
@@ -264,6 +272,12 @@ export async function deleteTrackedOrder(orderNumber: string, phone?: string): P
  */
 export function generateMerchantRef(): string {
   const ts = Date.now()
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const arr = new Uint8Array(6)
+  window.crypto.getRandomValues(arr)
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  let rand = ''
+  for (let i = 0; i < arr.length; i++) {
+    rand += chars[arr[i] % chars.length]
+  }
   return `GDS-${ts}-${rand}`
 }

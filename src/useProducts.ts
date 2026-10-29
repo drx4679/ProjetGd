@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import defaultSnapshot from './products-snapshot.json'
+import { getJweRequestHeaders, parseAndDecryptJwe } from './jweClient'
 
 export type Product = {
   id: string
@@ -249,9 +250,11 @@ export function useProducts() {
         let catalog2: any[] = []
         let publicData: any[] = []
 
-        const res = await fetch('/api/products', { headers: { Accept: 'application/json' } })
+        const headers = await getJweRequestHeaders({ Accept: 'application/json' })
+        const res = await fetch('/api/products', { headers })
         if (res.ok) {
-          const json = await res.json()
+          const rawJson = await res.json()
+          const json = await parseAndDecryptJwe<{ catalog2?: any[]; publicProducts?: any[] }>(rawJson)
           catalog2 = Array.isArray(json?.catalog2) ? json.catalog2 : []
           publicData = Array.isArray(json?.publicProducts) ? json.publicProducts : []
         }

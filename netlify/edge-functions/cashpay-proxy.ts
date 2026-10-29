@@ -19,6 +19,91 @@ export const config: Config = {
 let cachedToken: string | null = null
 let tokenExpiresAt = 0
 let tokenPromise: Promise<string> | null = null
+let fallbackServerPubKeyPromise: Promise<CryptoKey> | null = null
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+function base64UrlToBytes(b64url: string): Uint8Array {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/")
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4))
+  const binary = atob(b64 + pad)
+  const out = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    out[i] = binary.charCodeAt(i)
+  }
+  return out
+}
+
+async function resolveRecipientPublicKey(pubKeyB64Url: string | null): Promise<CryptoKey> {
+  if (pubKeyB64Url && /^[A-Za-z0-9_-]{200,800}$/.test(pubKeyB64Url.trim())) {
+    try {
+      const spkiBytes = base64UrlToBytes(pubKeyB64Url.trim())
+      return await crypto.subtle.importKey(
+        "spki",
+        spkiBytes as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["encrypt"]
+      )
+    } catch {}
+  }
+  if (!fallbackServerPubKeyPromise) {
+    fallbackServerPubKeyPromise = (async () => {
+      const kp = await crypto.subtle.generateKey(
+        {
+          name: "RSA-OAEP",
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: "SHA-256",
+        },
+        false,
+        ["encrypt", "decrypt"]
+      )
+      return kp.publicKey
+    })()
+  }
+  return fallbackServerPubKeyPromise
+}
+
+async function buildJweResponse(
+  data: unknown,
+  status: number,
+  headers: Record<string, string>,
+  pubKeyB64Url: string | null
+): Promise<Response> {
+  const publicKey = await resolveRecipientPublicKey(pubKeyB64Url)
+  const protectedHeaderB64 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIn0"
+  const aad = new TextEncoder().encode(protectedHeaderB64)
+  const cek = crypto.getRandomValues(new Uint8Array(32))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+
+  const encryptedKeyBuf = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, cek)
+  const encryptedKeyB64 = bytesToBase64Url(new Uint8Array(encryptedKeyBuf))
+
+  const aesKey = await crypto.subtle.importKey("raw", cek, { name: "AES-GCM" }, false, ["encrypt"])
+  const plaintextBytes = new TextEncoder().encode(JSON.stringify(data))
+  const encryptedBuf = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
+    aesKey,
+    plaintextBytes
+  )
+  const encryptedBytes = new Uint8Array(encryptedBuf)
+  const ciphertextBytes = encryptedBytes.slice(0, encryptedBytes.length - 16)
+  const tagBytes = encryptedBytes.slice(encryptedBytes.length - 16)
+
+  const jwe = `${protectedHeaderB64}.${encryptedKeyB64}.${bytesToBase64Url(iv)}.${bytesToBase64Url(ciphertextBytes)}.${bytesToBase64Url(tagBytes)}`
+
+  return new Response(
+    JSON.stringify({ success: true, encrypted: true, jwe }, null, 4),
+    { status, headers }
+  )
+}
 
 function getEnv(key: string): string | undefined {
   try {
@@ -181,7 +266,7 @@ export default async (req: Request, context: Context) => {
         ...secHeaders,
         "Access-Control-Allow-Origin": reqOrigin || configuredSiteUrl,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, X-Pub-Key",
       },
     })
   }
@@ -497,10 +582,7 @@ export default async (req: Request, context: Context) => {
         }
       }
 
-      return new Response(responseText, {
-        status: cpResponse.status,
-        headers: secHeaders,
-      })
+      return await buildJweResponse(cashpayData, cpResponse.status, secHeaders, req.headers.get("x-pub-key"))
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -600,13 +682,15 @@ export default async (req: Request, context: Context) => {
       }
 
       const isPaid = cpPaid || dbPaid
-      return new Response(
-        JSON.stringify({
+      return await buildJweResponse(
+        {
           ...cpData,
           paid: isPaid,
           payment_status: isPaid ? "paid" : dbPaymentStatus,
-        }),
-        { status: 200, headers: secHeaders }
+        },
+        200,
+        secHeaders,
+        req.headers.get("x-pub-key")
       )
     }
 
@@ -700,10 +784,7 @@ export default async (req: Request, context: Context) => {
       const rows = await sbResp.json()
       const orders = Array.isArray(rows) ? rows : []
 
-      return new Response(JSON.stringify({ orders }), {
-        status: 200,
-        headers: secHeaders,
-      })
+      return await buildJweResponse({ orders }, 200, secHeaders, req.headers.get("x-pub-key"))
     }
 
     // ══════════════════════════════════════════════════════════════
