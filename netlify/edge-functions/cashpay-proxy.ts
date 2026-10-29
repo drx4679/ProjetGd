@@ -107,7 +107,12 @@ const rateMap = new Map<string, { start: number; count: number }>()
 
 function checkRateLimit(ip: string, action: string): boolean {
   const now = Date.now()
-  const maxReqs = action === "check_status" ? 30 : 8
+  const maxReqs =
+    action === "check_status" || action === "track_orders"
+      ? 30
+      : action === "delete_order"
+      ? 15
+      : 8
   const key = `${ip}:${action || "default"}`
 
   if (rateMap.size > 1000) {
@@ -574,6 +579,188 @@ export default async (req: Request, context: Context) => {
         }),
         { status: 200, headers: secHeaders }
       )
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ACTION 3 : SUIVI DE COMMANDES (par téléphone et/ou référence)
+    // ══════════════════════════════════════════════════════════════
+    if (action === "track_orders") {
+      if (!supabaseUrl || !supabaseKey) {
+        return new Response(JSON.stringify({ error: "Configuration serveur manquante" }), {
+          status: 500,
+          headers: secHeaders,
+        })
+      }
+
+      const rawPhone = String(body?.phone || "").trim()
+      const rawRef = String(body?.orderRef || body?.orderNumber || "").trim()
+
+      const digitsOnly = rawPhone.replace(/\D/g, "")
+      const cleanRef = rawRef.replace(/[^a-zA-Z0-9\-_]/g, "")
+
+      if (digitsOnly.length < 6 && cleanRef.length < 4) {
+        return new Response(
+          JSON.stringify({
+            error: "Veuillez renseigner un numéro de téléphone ou une référence de commande valide.",
+          }),
+          { status: 400, headers: secHeaders }
+        )
+      }
+
+      const selectCols = [
+        "id",
+        "order_number",
+        "merchant_reference",
+        "cashpay_order_ref",
+        "cashpay_bill_url",
+        "customer_name",
+        "customer_phone",
+        "customer_address",
+        "delivery_address",
+        "delivery_city",
+        "delivery_country",
+        "items",
+        "total_amount",
+        "delivery_fee",
+        "final_amount",
+        "currency",
+        "status",
+        "payment_status",
+        "is_processing",
+        "is_shipped",
+        "is_delivered",
+        "created_at",
+        "updated_at",
+        "paid_at",
+        "shipped_at",
+        "delivered_at",
+        "delivery_lat",
+        "delivery_lng",
+        "delivery_latitude",
+        "delivery_longitude",
+      ].join(",")
+
+      let queryUrl = `${supabaseUrl}/rest/v1/orders?select=${selectCols}&order=created_at.desc&limit=25`
+
+      const last8 = digitsOnly.length >= 8 ? digitsOnly.slice(-8) : digitsOnly
+      if (cleanRef && last8.length >= 6) {
+        const encRef = encodeURIComponent(cleanRef)
+        queryUrl += `&or=(order_number.ilike.${encRef},merchant_reference.ilike.${encRef},cashpay_order_ref.ilike.${encRef})&customer_phone=ilike.*${encodeURIComponent(last8)}*`
+      } else if (cleanRef) {
+        const encRef = encodeURIComponent(cleanRef)
+        queryUrl += `&or=(order_number.ilike.${encRef},merchant_reference.ilike.${encRef},cashpay_order_ref.ilike.${encRef})`
+      } else {
+        queryUrl += `&customer_phone=ilike.*${encodeURIComponent(last8)}*`
+      }
+
+      const sbResp = await fetch(queryUrl, {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        signal: AbortSignal.timeout(8000),
+      })
+
+      if (!sbResp.ok) {
+        return new Response(
+          JSON.stringify({ error: "Impossible de consulter les commandes pour le moment." }),
+          { status: 502, headers: secHeaders }
+        )
+      }
+
+      const rows = await sbResp.json()
+      const orders = Array.isArray(rows) ? rows : []
+
+      return new Response(JSON.stringify({ orders }), {
+        status: 200,
+        headers: secHeaders,
+      })
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ACTION 4 : SUPPRIMER UNE COMMANDE DEPUIS LE SUIVI CLIENT
+    // ══════════════════════════════════════════════════════════════
+    if (action === "delete_order") {
+      if (!supabaseUrl || !supabaseKey) {
+        return new Response(JSON.stringify({ error: "Configuration serveur manquante" }), {
+          status: 500,
+          headers: secHeaders,
+        })
+      }
+
+      const orderNumber = String(body?.orderNumber || "").trim()
+      const phone = String(body?.phone || "").trim()
+
+      if (!orderNumber || !/^[\w-]+$/.test(orderNumber)) {
+        return new Response(JSON.stringify({ error: "Référence de commande invalide" }), {
+          status: 400,
+          headers: secHeaders,
+        })
+      }
+
+      const encRef = encodeURIComponent(orderNumber)
+      const lookupResp = await fetch(
+        `${supabaseUrl}/rest/v1/orders?or=(order_number.eq.${encRef},merchant_reference.eq.${encRef})&select=id,order_number,customer_phone,is_shipped,is_delivered&limit=1`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          signal: AbortSignal.timeout(6000),
+        }
+      )
+
+      if (!lookupResp.ok) {
+        return new Response(JSON.stringify({ error: "Erreur lors de la vérification de la commande" }), {
+          status: 500,
+          headers: secHeaders,
+        })
+      }
+
+      const rows = await lookupResp.json()
+      const order = Array.isArray(rows) ? rows[0] : null
+      if (!order) {
+        return new Response(JSON.stringify({ error: "Commande introuvable" }), {
+          status: 404,
+          headers: secHeaders,
+        })
+      }
+
+      // Si la commande a un téléphone enregistré et que le client a fourni un téléphone, vérifier les 8 derniers chiffres
+      const inputDigits = phone.replace(/\D/g, "")
+      const orderDigits = String(order.customer_phone || "").replace(/\D/g, "")
+      if (orderDigits.length >= 8 && inputDigits.length >= 8) {
+        if (inputDigits.slice(-8) !== orderDigits.slice(-8)) {
+          return new Response(
+            JSON.stringify({ error: "Non autorisé : ce numéro ne correspond pas à la commande" }),
+            { status: 403, headers: secHeaders }
+          )
+        }
+      }
+
+      const delResp = await fetch(
+        `${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(order.id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          signal: AbortSignal.timeout(6000),
+        }
+      )
+
+      if (!delResp.ok) {
+        return new Response(JSON.stringify({ error: "Impossible de supprimer la commande" }), {
+          status: 500,
+          headers: secHeaders,
+        })
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: secHeaders,
+      })
     }
 
     return new Response(JSON.stringify({ error: "Action inconnue" }), {

@@ -772,7 +772,7 @@ export default function App() {
     )}
     </div>
     <main id="main-content" tabIndex={-1}>
-      {currentView === 'tracking' && <OrderTracking />}
+      {currentView === 'tracking' && <OrderTracking products={products} onBack={() => navigateToView('home')} />}
       {currentView === 'about' && <About onBack={() => navigateToView('home')} />}
       {currentView === 'privacy' && <Privacy onBack={() => navigateToView('home')} />}
       {currentView === 'cgv' && <Cgv onBack={() => navigateToView('home')} />}

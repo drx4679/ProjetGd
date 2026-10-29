@@ -157,6 +157,108 @@ export async function getOrderStatus(orderReference: string, merchantRef?: strin
   }
 }
 
+export type TrackedOrder = {
+  id: number | string
+  order_number: string
+  merchant_reference?: string | null
+  cashpay_order_ref?: string | null
+  cashpay_bill_url?: string | null
+  customer_name?: string | null
+  customer_phone?: string | null
+  customer_address?: string | null
+  delivery_address?: string | null
+  delivery_city?: string | null
+  delivery_country?: string | null
+  items?: Array<{
+    id?: string
+    name: string
+    quantity: number
+    price: number
+    image_url?: string
+    variant?: string | null
+    selectedColor?: string | null
+    selectedSize?: string | null
+  }> | null
+  total_amount?: number | null
+  delivery_fee?: number | null
+  final_amount?: number | null
+  currency?: string | null
+  status?: string | null
+  payment_status?: string | null
+  is_processing?: boolean | null
+  is_shipped?: boolean | null
+  is_delivered?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
+  paid_at?: string | null
+  shipped_at?: string | null
+  delivered_at?: string | null
+  delivery_lat?: number | null
+  delivery_lng?: number | null
+  delivery_latitude?: number | null
+  delivery_longitude?: number | null
+}
+
+/**
+ * Recherche les commandes d'un client par numéro de téléphone et/ou par référence de commande.
+ */
+export async function trackOrders(phone: string, orderRef?: string): Promise<TrackedOrder[]> {
+  const timeout = createTimeout(15000)
+  try {
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'track_orders',
+        phone: phone.trim(),
+        orderRef: (orderRef || '').trim(),
+      }),
+      signal: timeout.signal,
+    })
+
+    if (!response.ok) {
+      const errMsg = await parseErrorMessage(response)
+      throw new Error(errMsg)
+    }
+
+    const data = await response.json()
+    return Array.isArray(data?.orders) ? data.orders : []
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error('Délai dépassé — vérifiez votre connexion et réessayez.')
+    }
+    throw e
+  } finally {
+    timeout.clear()
+  }
+}
+
+/**
+ * Supprime une commande depuis le suivi client.
+ */
+export async function deleteTrackedOrder(orderNumber: string, phone?: string): Promise<void> {
+  const timeout = createTimeout(12000)
+  try {
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete_order',
+        orderNumber: orderNumber.trim(),
+        phone: (phone || '').trim(),
+      }),
+      signal: timeout.signal,
+    })
+
+    if (!response.ok) {
+      const errMsg = await parseErrorMessage(response)
+      throw new Error(errMsg)
+    }
+  } finally {
+    timeout.clear()
+  }
+}
+
 /**
  * Génère une référence marchande unique (format GDS-TIMESTAMP-RAND).
  */

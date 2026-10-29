@@ -263,6 +263,8 @@ export default function Checkout({
 
       try {
         localStorage.setItem('pendingPayment', JSON.stringify(pendingData))
+        localStorage.setItem('gds_tracking_phone', fullPhone)
+        localStorage.setItem('gds_tracking_last_ref', merchantRef)
       } catch {}
 
       // Rediriger vers le portail de paiement sécurisé CashPay
