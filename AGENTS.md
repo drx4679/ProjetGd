@@ -1,37 +1,34 @@
-# figma-make-app
+# GoodDoctor's Shop
 
-React + Vite + Tailwind CSS project running inside Figma Make.
+Site e-commerce d'uniformes et dispositifs médicaux de luxe avec React 19 + Vite + Tailwind CSS v4.
 
-## Development Server
+## Serveur de Développement
 
-A Vite development server is **already running** on `$PORT` (default 8443). You don't need to start it manually.
+Un serveur Vite tourne sur le port `8443`.
 
-- Preview URL: The user can access the running app through the preview panel
-- Hot reload: Changes to source files are reflected immediately
+- Port par défaut : `8443`
+- Hot reload : Les modifications dans `src/` sont rechargées immédiatement
 
-## Project Structure
+## Structure du Projet
 
-This is the canonical project structure. Start with task-relevant files below. Only follow imports or inspect other files when required, when a documented path is missing, or when the repository contradicts this guide.
+- `src/main.tsx` - Point d'entrée React ; importe `src/index.css` et monte `src/App.tsx`
+- `src/App.tsx` - Composant racine de l'application
+- `src/Checkout.tsx` - Composant du tunnel de commande et paiement CashPay
+- `src/index.css` - Point d'entrée CSS global et import Tailwind CSS v4
+- `index.html` - Shell HTML Vite avec métadonnées SEO/OpenGraph et point de montage
+- `package.json` - Dépendances et scripts Vite (`dev`, `build`, `preview`)
+- `vite.config.ts` - Configuration Vite avec React, Tailwind CSS v4, middleware de sécurité CSP et proxy API local
+- `netlify/functions/` - Fonctions serverless Netlify (produits, proxy CashPay, webhooks)
+- `supabase/` - Migrations et schéma de base de données PostgreSQL
 
-- `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
-- `src/App.tsx` - Primary application component and the usual starting point for UI work
-- `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
-- `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
-- `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
-- `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
-- `.mise.toml` - Toolchain versions for Node.js and pnpm
+## Dépendances
 
-## Dependencies
+- Runtime: React 19 et React DOM 19
+- Styling: Tailwind CSS v4 avec le plugin `@tailwindcss/vite`
+- Build tooling: Vite 8, TypeScript 5.7, et `@vitejs/plugin-react`
 
-- Runtime: React 19 and React DOM 19
-- Styling: Tailwind CSS v4 with the `@tailwindcss/vite` plugin
-- Build tooling: Vite 8, TypeScript 5.7, and `@vitejs/plugin-react`
-- Formatting: oxfmt
+## Sécurité et API
 
-## Styling
-
-This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin configured in `vite.config.ts`. `src/index.css` imports Tailwind with `@import 'tailwindcss';`. Use Tailwind utility classes directly in JSX and put global CSS or Tailwind v4 theme customization in `src/index.css`. This scaffold does not need a Tailwind config file or PostCSS config.
-
-`src/main.tsx` imports `src/index.css`, so global font wiring belongs in `src/index.css`. Keep CSS `@import` statements first, then add any `@font-face` rules and font-family defaults there.
-
-Tailwind emits utility classes in `@layer utilities`, and CSS outside any cascade layer overrides every layer regardless of specificity. Put global element styles, such as resets and defaults for `body`, headings, `button`, or `input`, inside `@layer base { ... }` so utility classes on those elements still apply. Tailwind's Preflight already applies `box-sizing: border-box`, removes default margins, and sets `font: inherit` on form controls, so do not repeat those rules.
+- Pas de clé secrète exposée côté navigateur.
+- Toutes les requêtes sensibles passent par les fonctions Edge / Netlify (`/api/products`, `/api/cashpay-proxy`).
+- Les charges utiles API sont chiffrées en JWE (RSA-OAEP-256 + A256GCM).
