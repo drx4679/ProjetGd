@@ -11,9 +11,6 @@ import { useProducts, type Product } from './useProducts'
 
 const photos = {
   hero: '/IMG_8380.jpeg',
-  fashion: 'https://images.unsplash.com/photo-1785414671269-6201c3daf7c8?auto=format&fit=crop&w=700&q=80',
-  shoe: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=700&q=85',
-  sport: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=700&q=80',
 }
 
 const placeholder = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=650&q=80'
@@ -652,6 +649,13 @@ export default function App() {
         </button>
         <button
           type="button"
+          className={currentView === 'tracking' ? 'active' : ''}
+          onClick={() => navigateToView('tracking')}
+        >
+          Suivre ma commande
+        </button>
+        <button
+          type="button"
           className={currentView === 'about' ? 'active' : ''}
           onClick={() => navigateToView('about')}
         >
@@ -778,9 +782,9 @@ export default function App() {
       {currentView === 'cgv' && <Cgv onBack={() => navigateToView('home')} />}
       <div hidden={currentView !== 'home'}>
       <section className="hero">
-        <img src={photos.hero} alt="Mode urbaine et silhouettes de la nouvelle collection" />
+        <img src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" />
         <div className="hero-shade"/>
-        <div className="hero-content"><h1>L'empreinte<br/>de la Qualite.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande"><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
+        <div className="hero-content"><h1>L'empreinte<br/>de la Qualite.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande" onClick={(e) => { e.preventDefault(); navigateToView('tracking'); }}><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
         <div className="hero-bottom"><button className="ml-auto" aria-label="Découvrir nos gammes" onClick={() => go()}>↓</button></div>
         <div className="hero-sticker">PROMO<br/><b>EXCLUSIF</b></div>
       </section>
@@ -855,12 +859,6 @@ export default function App() {
                 <button type="button" onClick={() => { setFilter('Tout'); navigateToView('home'); }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                   <span>Accueil</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => { setCatalog(true); setFilter('Tout'); navigateToView('home'); go(); }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                  <span>Catalogue des articles</span>
                 </button>
               </li>
               <li>
