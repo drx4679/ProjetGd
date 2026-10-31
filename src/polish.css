@@ -40,42 +40,37 @@
 .hero-content { animation: gentle-rise .65s ease-out both; }
 .hero-sticker { background: #e0f2fa; color: #086f9e; }
 
-/* ═══ HERO RÉSEAU NEURONAL MÉDICAL — tablette & PC (≥ 601px) ═══ */
+/* ═══ HERO PHOTO LUMINEUSE — tablette & PC (≥ 601px) ═══ */
 @media (min-width: 601px) {
-  /* Cacher l'image photo sombre, afficher le réseau neuronal animé */
+  /* Afficher la photo produit avec un traitement clair et lumineux */
   .hero-photo {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center 43% !important;
+    filter: brightness(1.05) saturate(0.85) !important;
+  }
+
+  /* Masquer le canvas neuronal animé sur PC/tablette */
+  .hero-abstract {
     display: none !important;
   }
 
-  .hero-abstract {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: auto;
-  }
-
-  .hero-neural-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  /* Fond médical clair, lumineux, épuré et moderne (suppression de toute couleur sombre) */
+  /* Fond de secours lumineux si la photo charge lentement */
   .hero {
-    background:
-      radial-gradient(ellipse 70% 60% at 85% 35%, rgba(14, 165, 233, 0.18) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 50% at 20% 80%, rgba(8, 127, 181, 0.12) 0%, transparent 60%),
-      linear-gradient(140deg, #f8fafc 0%, #edf6fa 45%, #f1f8fc 80%, #ffffff 100%) !important;
+    background: linear-gradient(140deg, #f8fafc 0%, #edf6fa 45%, #f1f8fc 80%, #ffffff 100%) !important;
     border-bottom: 1px solid #e1edf3 !important;
   }
 
-  /* Voile lumineux à gauche pour garantir une lisibilité absolue du texte sans assombrir */
+  /* Voile blanc lumineux à gauche pour lisibilité parfaite du texte sans assombrir */
   .hero-shade {
     background: linear-gradient(
       95deg,
-      rgba(248, 250, 252, 0.90) 0%,
-      rgba(248, 250, 252, 0.70) 42%,
-      rgba(248, 250, 252, 0.15) 75%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(248, 250, 252, 0.82) 35%,
+      rgba(248, 250, 252, 0.45) 60%,
+      rgba(248, 250, 252, 0.12) 80%,
       transparent 100%
     ) !important;
     pointer-events: none;
@@ -83,11 +78,12 @@
 
   .hero-content h1 {
     color: #0c202d !important;
-    text-shadow: none !important;
+    text-shadow: 0 1px 8px rgba(255, 255, 255, 0.7) !important;
   }
   .hero-content > p {
-    color: #334155 !important;
+    color: #1e3a4f !important;
     font-weight: 450;
+    text-shadow: 0 1px 4px rgba(255, 255, 255, 0.6);
   }
   .hero-bottom {
     color: #4b6371 !important;
@@ -106,21 +102,23 @@
     border-color: #087fb5 !important;
   }
   .hero .tracking-link {
-    background: #ffffff !important;
+    background: rgba(255, 255, 255, 0.92) !important;
     color: #087fb5 !important;
     border: 1px solid #bfe0f0 !important;
     box-shadow: 0 3px 12px rgba(8, 127, 181, 0.09) !important;
+    backdrop-filter: blur(6px);
   }
   .hero .tracking-link:hover {
-    background: #f0f8fc !important;
+    background: #ffffff !important;
     border-color: #087fb5 !important;
     box-shadow: 0 5px 16px rgba(8, 127, 181, 0.16) !important;
   }
   .hero-sticker {
-    background: #e0f2fa !important;
+    background: rgba(224, 242, 250, 0.92) !important;
     color: #086f9e !important;
     border: 1px solid #b8e2f6 !important;
     box-shadow: 0 4px 14px rgba(8, 111, 158, 0.1) !important;
+    backdrop-filter: blur(4px);
   }
 }
 
