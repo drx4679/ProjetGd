@@ -268,6 +268,44 @@ export default function App() {
     setIsDetailImgLight(true)
   }, [])
 
+  // ── OUVERTURE AUTOMATIQUE D'UN ARTICLE VIA LIEN DE PARTAGE (?product=...) ──
+  useEffect(() => {
+    if (products.length === 0) return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const target = params.get('product') || params.get('p') || params.get('id') || params.get('article')
+      if (!target) return
+
+      const clean = decodeURIComponent(target).trim()
+      const rawNum = clean.replace(/^(C2-|PB-)/i, '')
+      const found = products.find(p =>
+        p.id === clean ||
+        p.id.toLowerCase() === clean.toLowerCase() ||
+        p.id.replace(/^(C2-|PB-)/i, '') === rawNum ||
+        p.name.toLowerCase().includes(clean.toLowerCase())
+      )
+
+      if (found) {
+        handleOpenDetails(found)
+        setCurrentView('home')
+        const cleanUrl = window.location.pathname + (window.location.hash || '')
+        window.history.replaceState({}, '', cleanUrl)
+      }
+    } catch {
+      // Ignorer les erreurs d'URL invalide
+    }
+  }, [products, handleOpenDetails])
+
+  // Titre d'onglet dynamique quand un article est ouvert
+  useEffect(() => {
+    if (!detailProduct) return
+    const prevTitle = document.title
+    document.title = `${detailProduct.name} | GoodDoctor's Shop`
+    return () => {
+      document.title = prevTitle
+    }
+  }, [detailProduct])
+
   const handleDetailWheel = useCallback((e: React.WheelEvent) => {
     if (!detailProduct || detailProduct.images.length <= 1) return
     const now = Date.now()
@@ -627,24 +665,28 @@ export default function App() {
   }, [])
 
   const handleShare = useCallback((product: Product) => {
-    const url = window.location.href.split('#')[0]
-    const text = `${product.name} - ${formatMoney(product.price)} sur GoodDoctor's Shop`
+    const origin = window.location.origin
+    const shareUrl = `${origin}/p/${encodeURIComponent(product.id)}`
+    const priceStr = product.price > 0 ? ` — ${formatMoney(product.price)}` : ''
+    const shareText = `${product.name} — Certifié disponible sur GoodDoctor's Shop${priceStr}`
+    const fullMessage = `${shareText}\n${shareUrl}`
+
     if (navigator.share) {
       navigator.share({
-        title: product.name,
-        text,
-        url,
+        title: `${product.name} | GoodDoctor's Shop`,
+        text: shareText,
+        url: shareUrl,
       }).catch((err) => {
         if (err.name !== 'AbortError') {
-          navigator.clipboard?.writeText(`${text}\n${url}`)
-          showToast('Lien copié dans le presse-papier !')
+          navigator.clipboard?.writeText(fullMessage)
+          showToast("Lien de l'article copié !")
         }
       })
     } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(`${text}\n${url}`)
-      showToast('Lien copié dans le presse-papier !')
+      navigator.clipboard.writeText(fullMessage)
+      showToast("Lien de l'article copié !")
     } else {
-      showToast('Lien prêt à être partagé')
+      showToast("Lien de l'article prêt")
     }
   }, [showToast])
 

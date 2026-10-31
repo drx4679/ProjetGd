@@ -70,7 +70,8 @@ function gdLocalApiPlugin(): Plugin {
             const method = req.method || 'GET'
             const proto = (req.headers['x-forwarded-proto'] as string) || 'http'
             const host = req.headers.host || 'localhost:8443'
-            const url = `${proto}://${host}${routePath}`
+            const subPath = req.url && req.url !== '/' ? req.url : ''
+            const url = `${proto}://${host}${routePath}${subPath}`
 
             const chunks: Buffer[] = []
             if (method !== 'GET' && method !== 'HEAD') {
@@ -103,6 +104,7 @@ function gdLocalApiPlugin(): Plugin {
 
       mountEdgeFunction('/api/products', '/netlify/edge-functions/products.ts')
       mountEdgeFunction('/api/cashpay-proxy', '/netlify/edge-functions/cashpay-proxy.ts')
+      mountEdgeFunction('/p', '/netlify/edge-functions/og-preview.ts')
     },
   }
 }
@@ -122,7 +124,7 @@ function gdSecurityPlugin(): Plugin {
     "script-src 'self' https://unpkg.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
     "font-src 'self' https://fonts.gstatic.com",
-    `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com`,
+    `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com https://wsrv.nl`,
     `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org`,
     "frame-src 'none'",
     "object-src 'none'",
