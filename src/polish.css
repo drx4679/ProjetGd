@@ -21,9 +21,9 @@
 
 /* ═══ HERO RÉSEAU NEURONAL MÉDICAL — tablette & PC (≥ 601px) ═══ */
 
-/* Par défaut (tablette/PC) : cacher l'image, montrer le réseau neuronal animé */
+/* Par défaut (tablette/PC) : cacher l'image photo sombre, montrer le réseau neuronal animé */
 .hero-photo {
-  display: none;
+  display: none !important;
 }
 
 .hero-abstract {
@@ -39,24 +39,24 @@
   display: block;
 }
 
-/* Fond médical clair, lumineux, épuré et moderne */
+/* Fond médical clair, lumineux, épuré et moderne (suppression de toute couleur sombre) */
 .hero {
   background:
-    radial-gradient(ellipse 70% 60% at 85% 35%, rgba(14, 165, 233, 0.16) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 50% at 20% 80%, rgba(8, 127, 181, 0.09) 0%, transparent 60%),
-    linear-gradient(140deg, #f8fafc 0%, #edf6fa 45%, #f1f8fc 80%, #ffffff 100%);
-  border-bottom: 1px solid #e1edf3;
+    radial-gradient(ellipse 70% 60% at 85% 35%, rgba(14, 165, 233, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 20% 80%, rgba(8, 127, 181, 0.12) 0%, transparent 60%),
+    linear-gradient(140deg, #f8fafc 0%, #edf6fa 45%, #f1f8fc 80%, #ffffff 100%) !important;
+  border-bottom: 1px solid #e1edf3 !important;
 }
 
-/* Voile doux à gauche pour garantir une lisibilité absolue du texte */
+/* Voile lumineux à gauche pour garantir une lisibilité absolue du texte sans assombrir */
 .hero-shade {
   background: linear-gradient(
     95deg,
-    rgba(248, 250, 252, 0.94) 0%,
-    rgba(248, 250, 252, 0.82) 42%,
-    rgba(248, 250, 252, 0.25) 75%,
+    rgba(248, 250, 252, 0.90) 0%,
+    rgba(248, 250, 252, 0.70) 42%,
+    rgba(248, 250, 252, 0.15) 75%,
     transparent 100%
-  );
+  ) !important;
   pointer-events: none;
 }
 
