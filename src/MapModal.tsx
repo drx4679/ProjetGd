@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { freeDeliveryThreshold } from './money'
 
 const HQ_LAT = 6.193097
@@ -357,7 +358,7 @@ export default function MapModal({
     ? 'Livraison Offerte'
     : currentFee?.label || '1 000 FCFA'
 
-  return (
+  return createPortal(
     <div className="map-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Choisir le point de livraison">
       <div className="map-modal-panel" onClick={e => e.stopPropagation()}>
         {/* Poignée mobile */}
@@ -582,6 +583,7 @@ export default function MapModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
