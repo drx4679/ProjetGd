@@ -399,11 +399,9 @@ export default function OrderTracking({
       </a>
 
       <div className="tracking-intro">
-        <span className="eyebrow">SUIVI LOGISTIQUE EN TEMPS RÉEL</span>
         <h1>Suivre ma commande</h1>
         <p>
-          Retrouvez toutes vos commandes par <strong>numéro de téléphone</strong> ou par{' '}
-          <strong>référence de commande</strong>, suivez l'acheminement en direct et réglez vos commandes en attente via CashPay.
+          Suivez la préparation et l'acheminement de vos articles médicaux en saisissant votre numéro de téléphone ou votre référence de commande.
         </p>
       </div>
 
@@ -420,7 +418,7 @@ export default function OrderTracking({
             {/* Recherche par numéro de téléphone */}
             <div className="tracking-field">
               <label htmlFor="tracking-phone-input">
-                Numéro de téléphone <span className="tracking-badge-hint">Suivi de toutes vos commandes</span>
+                Numéro de téléphone
               </label>
               <div className="tracking-phone-group">
                 <select
@@ -464,7 +462,7 @@ export default function OrderTracking({
             {/* Recherche par référence de commande */}
             <div className="tracking-field">
               <label htmlFor="tracking-order-input">
-                Référence de commande <span className="tracking-optional">(optionnel avec le téléphone)</span>
+                Référence de commande
               </label>
               <div className="tracking-ref-group">
                 <input
@@ -564,7 +562,7 @@ export default function OrderTracking({
               <span className="tracking-live-ping" />
               <span className="tracking-live-core" />
             </span>
-            <span>Connecté en direct · Actualisé à {lastSyncTime}</span>
+            <span>Actualisé à {lastSyncTime}</span>
           </div>
           <button
             type="button"
@@ -593,8 +591,8 @@ export default function OrderTracking({
         {loading ? (
           <div className="tracking-state-card">
             <div className="tracking-spinner" />
-            <h3>Recherche de vos commandes en direct…</h3>
-            <p className="tracking-muted">Interrogation de la base logistique GoodDoctor's Shop</p>
+            <h3>Recherche de vos commandes…</h3>
+            <p className="tracking-muted">Veuillez patienter un instant.</p>
           </div>
         ) : !hasSearched ? (
           <div className="tracking-state-card">
@@ -603,9 +601,9 @@ export default function OrderTracking({
                 <path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7 5l10 4" />
               </svg>
             </div>
-            <h3>Entrez votre numéro de téléphone pour retrouver vos commandes</h3>
+            <h3>Retrouvez l'état de votre commande</h3>
             <p className="tracking-muted">
-              Saisissez le numéro de téléphone utilisé lors de votre achat (ex : <strong>90 00 00 00</strong>) ou votre référence <strong>GDS-...</strong> pour afficher l'état de préparation et de livraison en direct.
+              Indiquez le numéro de téléphone utilisé lors de votre commande ou votre référence pour suivre votre livraison.
             </p>
           </div>
         ) : orders.length === 0 ? (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { freeDeliveryThreshold } from './money'
 
 const HQ_LAT = 6.193097
 const HQ_LNG = 1.203188
@@ -119,13 +120,17 @@ export function computeDeliveryFee(distKm: number): { fee: number; label: string
 export default function MapModal({
   open,
   initialCoords,
+  subtotal = 0,
   onClose,
   onConfirm,
+  onRealtimeUpdate,
 }: {
   open: boolean
   initialCoords?: { lat: number; lng: number } | null
+  subtotal?: number
   onClose: () => void
   onConfirm: (lat: number, lng: number, address: string, distKm: number) => void
+  onRealtimeUpdate?: (lat: number, lng: number, address: string, distKm: number) => void
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -156,6 +161,9 @@ export default function MapModal({
       setAddress(addr)
       setDistKm(routeInfo.distanceKm)
 
+      // Mise à jour instantanée du panier et du paiement en temps réel (sans attendre de confirmer)
+      onRealtimeUpdate?.(lat, lng, addr, routeInfo.distanceKm)
+
       const L = (window as any).L
       if (L && mapInstanceRef.current) {
         if (routeLayerRef.current) {
@@ -179,11 +187,15 @@ export default function MapModal({
         }
       }
     } catch {
-      setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+      const fallbackAddr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      const fallbackDist = haversineKm(HQ_LAT, HQ_LNG, lat, lng)
+      setAddress(fallbackAddr)
+      setDistKm(fallbackDist)
+      onRealtimeUpdate?.(lat, lng, fallbackAddr, fallbackDist)
     } finally {
       setCalculating(false)
     }
-  }, [])
+  }, [onRealtimeUpdate])
 
   useEffect(() => {
     if (!open) {
@@ -339,26 +351,33 @@ export default function MapModal({
 
   if (!open) return null
 
+  const isFreeDelivery = subtotal >= freeDeliveryThreshold
   const currentFee = distKm !== null ? computeDeliveryFee(distKm) : null
+  const displayFeeLabel = isFreeDelivery
+    ? 'Livraison Offerte'
+    : currentFee?.label || '1 000 FCFA'
 
   return (
-    <div className="map-modal-overlay" onClick={onClose}>
+    <div className="map-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Choisir le point de livraison">
       <div className="map-modal-panel" onClick={e => e.stopPropagation()}>
         {/* Poignée mobile */}
         <div className="map-modal-handle" />
 
-        {/* En-tête */}
+        {/* En-tête ergonomique */}
         <div className="map-modal-header">
           <div>
-            <div className="map-modal-eyebrow">LIVRAISON À LOMÉ &amp; TOGO</div>
+            <div className="map-modal-eyebrow">LIVRAISON TOGO &amp; ENVOIS INTERNATIONAUX</div>
             <h3>Point de livraison</h3>
-            <p className="map-modal-subtitle">Déplacez le marqueur bleu pour ajuster votre adresse</p>
+            <p className="map-modal-subtitle">
+              Déplacez le repère bleu ou cliquez sur la carte pour ajuster votre point exact
+            </p>
           </div>
           <button
             type="button"
             className="map-modal-close"
             onClick={onClose}
             aria-label="Fermer la carte"
+            title="Fermer"
           >
             <svg
               width="20"
@@ -383,12 +402,13 @@ export default function MapModal({
             className={`map-btn-gps ${locating ? 'loading' : ''}`}
             onClick={handleGPS}
             disabled={locating}
+            title="Utiliser ma position actuelle"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            {locating ? 'Localisation…' : 'Me localiser'}
+            <span>{locating ? 'Localisation…' : 'Me localiser'}</span>
           </button>
 
           <div className="map-search-box">
@@ -472,24 +492,65 @@ export default function MapModal({
           </div>
         </div>
 
-        {/* Aperçu adresse sélectionnée */}
+        {/* Aperçu adresse sélectionnée avec badge de synchronisation automatique */}
         {address && (
           <div className="map-address-preview">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            <p>{address}</p>
+            <p title={address}>{address}</p>
+            <span className="map-live-tag">
+              <span className="map-live-dot" />
+              Synchronisé en direct
+            </span>
           </div>
         )}
 
-        {/* Conteneur Leaflet */}
-        <div ref={mapContainerRef} className="map-leaflet-container" />
+        {/* Conteneur Leaflet avec badge prix flottant et bouton de recentrage */}
+        <div className="map-view-wrapper">
+          <div ref={mapContainerRef} className="map-leaflet-container" />
+
+          {/* Badge flottant en temps réel sur la carte */}
+          <div className="map-floating-price-card" role="status" aria-live="polite">
+            <div className="map-live-header">
+              <span className={`map-live-indicator ${calculating ? 'pulsing' : 'active'}`} />
+              <span className="map-live-title">
+                {calculating ? 'Calcul de distance en cours…' : 'Frais de livraison instantanés'}
+              </span>
+            </div>
+            <div className="map-live-body">
+              <strong className="map-live-price">{displayFeeLabel}</strong>
+              {distKm !== null && (
+                <span className="map-live-distance">
+                  {distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`} du siège
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Bouton recentrer sur le Siège GoodDoctor's */}
+          <button
+            type="button"
+            className="map-recenter-hq-btn"
+            onClick={() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.setView([HQ_LAT, HQ_LNG], 15)
+              }
+            }}
+            title="Recentrer la carte sur le siège GoodDoctor's Shop"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            <span>Siège GD</span>
+          </button>
+        </div>
 
         {/* Pied de page */}
         <div className="map-modal-footer">
           <button type="button" className="map-btn-cancel" onClick={onClose}>
-            Annuler
+            Fermer
           </button>
           <button
             type="button"
@@ -516,8 +577,7 @@ export default function MapModal({
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span>
-              Confirmer cette adresse
-              {currentFee && currentFee.fee > 0 ? ` · ${currentFee.label}` : ''}
+              Confirmer cette adresse · {displayFeeLabel}
             </span>
           </button>
         </div>
