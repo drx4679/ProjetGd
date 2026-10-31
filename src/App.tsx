@@ -631,22 +631,12 @@ export default function App() {
         GoodDoctor's <span className="shop-word">Shop</span>
       </a>
       <nav>
-        {filterCategories.filter(c => c !== 'Tout').map(n => (
-          <button
-            key={n}
-            type="button"
-            className={currentView === 'home' && filter === n ? 'active' : ''}
-            onClick={() => go(n)}
-          >
-            {n}
-          </button>
-        ))}
         <button
           type="button"
-          className={currentView === 'home' && filter === 'Tout' ? 'active' : ''}
+          className={currentView === 'home' ? 'active' : ''}
           onClick={() => { setCatalog(true); setSearch(''); setPanel(''); go('Tout'); }}
         >
-          Tout voir
+          Catalogue
         </button>
         <button
           type="button"

@@ -76,7 +76,7 @@
 
 .header .logo.shop-logo,
 footer .logo.shop-logo {
-  font-size: 25px;
+  font-size: 28px;
   letter-spacing: -1.2px;
   white-space: nowrap;
 }
@@ -98,12 +98,12 @@ footer .logo.shop-logo {
 .cart-item .variant-add { color: var(--color-accent); border-color: var(--color-accent); }
 .variant-summary { font-size: 10px; line-height: 1.5; color: #7d8075; }
 @media (min-width: 601px) and (max-width: 900px) {
-  .header .logo.shop-logo { font-size: 20px; }
-  .sticky-header .header nav { gap: 12px; font-size: 11px; }
+  .header .logo.shop-logo { font-size: 23px; }
+  .sticky-header .header nav { gap: 18px; font-size: 13px; }
 }
 @media (max-width: 600px) {
   .header .logo.shop-logo,
-  footer .logo.shop-logo { font-size: 21px; }
+  footer .logo.shop-logo { font-size: 22px; }
 }
 
 .sticky-header {
