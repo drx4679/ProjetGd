@@ -17,15 +17,17 @@ const photos = {
 const placeholder = '/no-image.svg'
 
 const MEDICAL_PARTNERS = [
-  '3M LITTMANN',
-  'OMRON HEALTHCARE',
-  'SPENGLER',
-  'YUWELL',
-  'B. BRAUN',
-  'SONOWIED SYSTEMS',
-  'ANNO MEDICAL',
-  'LEINAIKE',
-  'GOODDOCTOR®',
+  { src: '/partenaires/3M_Littmann_Logo.webp', alt: 'Littmann', scale: 1.8 },
+  { src: '/partenaires/OMRON_Logo.svg.webp', alt: 'Omron' },
+  { src: '/partenaires/Spengler-logo-transparenten.webp', alt: 'Spengler' },
+  { src: '/partenaires/Yuwell-Anytime-Yuwell-Logo.webp', alt: 'Yuwell' },
+  { src: '/partenaires/e436c027861786cd61b21afafc52aa13.webp', alt: 'Partner' },
+  { src: '/partenaires/png-clipart-b-braun-melsungen-company-health-care-chief-executive-others-miscellaneous-company.webp', alt: 'B. Braun' },
+  { src: '/partenaires/60c01030-3dea-457c-bfce-b84bb463ba3c.__CR0,0,600,180_PT0_SX600_V1___.webp', alt: 'Partner' },
+  { src: '/partenaires/MEDICA-2025-Sonowied-Vertriebs-und-Beratungsgesellschaft-fur-Sonographische-Systeme-mbH-Image-medica2025.3036738-M7h9vupRSbS5iZStEjNuIg-image.webp', alt: 'Sonowied' },
+  { src: '/partenaires/anno.webp', alt: 'Anno', scale: 1.8 },
+  { src: '/partenaires/leinaike.webp', alt: 'Leinaike', scale: 2 },
+  { src: '/partenaires/gdshp.webp', alt: 'GoodDoctor', scale: 3 },
 ]
 
 type CartItem = { productId: string; size: string; color: string; quantity: number; confirmed: boolean }
@@ -886,8 +888,14 @@ export default function App() {
           {[0, 1].map(i => (
             <div className="marquee-content" key={i} aria-hidden={i > 0 ? 'true' : undefined}>
               {[...MEDICAL_PARTNERS, ...MEDICAL_PARTNERS].map((partner, pIdx) => (
-                <span key={`${partner}-${pIdx}`} className="brand-logo" style={{ letterSpacing: '1px' }}>
-                  {partner}
+                <span key={`${partner.alt}-${pIdx}`} className="brand-logo">
+                  <img
+                    src={partner.src}
+                    alt={partner.alt}
+                    loading="lazy"
+                    decoding="async"
+                    style={partner.scale ? { transform: `scale(${partner.scale})` } : undefined}
+                  />
                 </span>
               ))}
             </div>
