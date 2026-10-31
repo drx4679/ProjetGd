@@ -5,6 +5,8 @@
 //   console F12, elle ne peut pas être exportée.
 // - Le serveur chiffre les réponses API (/api/products, /api/cashpay-proxy)
 //   en JWE compact : { success: true, encrypted: true, jwe: "eyJhbGci..." }
+// - Résistant aux environnements sans WebCrypto (HTTP direct, navigateurs anciens,
+//   webviews restreintes) : bascule en mode transparent sans lever d'exception.
 // ============================================================
 
 type EphemeralSession = {
@@ -12,7 +14,27 @@ type EphemeralSession = {
   privateKey: CryptoKey
 }
 
-let sessionPromise: Promise<EphemeralSession> | null = null
+let sessionPromise: Promise<EphemeralSession | null> | null = null
+
+/**
+ * Vérifie si WebCrypto Subtle est disponible et fonctionnel dans le contexte actuel
+ * (uniquement disponible en contexte sécurisé HTTPS ou localhost).
+ */
+export function hasSubtleCrypto(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.crypto !== 'undefined' &&
+      typeof window.crypto.subtle !== 'undefined' &&
+      typeof window.crypto.subtle.generateKey === 'function' &&
+      typeof window.crypto.subtle.decrypt === 'function' &&
+      typeof window.crypto.subtle.exportKey === 'function' &&
+      typeof window.crypto.subtle.importKey === 'function'
+    )
+  } catch {
+    return false
+  }
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = ''
@@ -33,24 +55,33 @@ function base64UrlToBytes(b64url: string): Uint8Array {
   return out
 }
 
-async function getOrCreateSession(): Promise<EphemeralSession> {
+async function getOrCreateSession(): Promise<EphemeralSession | null> {
+  if (!hasSubtleCrypto()) {
+    return null
+  }
+
   if (!sessionPromise) {
     sessionPromise = (async () => {
-      const keyPair = await window.crypto.subtle.generateKey(
-        {
-          name: 'RSA-OAEP',
-          modulusLength: 2048,
-          publicExponent: new Uint8Array([1, 0, 1]),
-          hash: 'SHA-256',
-        },
-        false, // Clé privée non-extractible
-        ['encrypt', 'decrypt']
-      )
-      const spkiBuffer = await window.crypto.subtle.exportKey('spki', keyPair.publicKey)
-      const publicKeyB64Url = bytesToBase64Url(new Uint8Array(spkiBuffer))
-      return {
-        publicKeyB64Url,
-        privateKey: keyPair.privateKey,
+      try {
+        const keyPair = await window.crypto.subtle.generateKey(
+          {
+            name: 'RSA-OAEP',
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: 'SHA-256',
+          },
+          false, // Clé privée non-extractible
+          ['encrypt', 'decrypt']
+        )
+        const spkiBuffer = await window.crypto.subtle.exportKey('spki', keyPair.publicKey)
+        const publicKeyB64Url = bytesToBase64Url(new Uint8Array(spkiBuffer))
+        return {
+          publicKeyB64Url,
+          privateKey: keyPair.privateKey,
+        }
+      } catch (err) {
+        console.warn('[JWE] Clé éphémère WebCrypto non disponible:', err)
+        return null
       }
     })()
   }
@@ -58,8 +89,14 @@ async function getOrCreateSession(): Promise<EphemeralSession> {
 }
 
 export async function getJweRequestHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  if (!hasSubtleCrypto()) {
+    return extra
+  }
   try {
     const session = await getOrCreateSession()
+    if (!session?.publicKeyB64Url) {
+      return extra
+    }
     return {
       ...extra,
       'X-Pub-Key': session.publicKeyB64Url,
@@ -74,52 +111,66 @@ export async function parseAndDecryptJwe<T = any>(payload: any): Promise<T> {
     return payload as T
   }
 
-  const parts = payload.jwe.split('.')
-  if (parts.length !== 5) {
-    throw new Error('Format JWE invalide')
+  if (!hasSubtleCrypto()) {
+    console.warn('[JWE] Payload chiffré reçu mais WebCrypto (window.crypto.subtle) est indisponible dans ce contexte.')
+    return payload as T
   }
 
-  const [headerB64, encryptedKeyB64, ivB64, ciphertextB64, tagB64] = parts
-  const session = await getOrCreateSession()
+  try {
+    const session = await getOrCreateSession()
+    if (!session) {
+      return payload as T
+    }
 
-  const encKeyBytes = base64UrlToBytes(encryptedKeyB64)
-  const ivBytes = base64UrlToBytes(ivB64)
-  const ciphertextBytes = base64UrlToBytes(ciphertextB64)
-  const tagBytes = base64UrlToBytes(tagB64)
+    const parts = payload.jwe.split('.')
+    if (parts.length !== 5) {
+      return payload as T
+    }
 
-  // 1. Déchiffrer la clé AES-256 (CEK) avec la clé privée RSA-OAEP-256 non-extractible
-  const cekBuffer = await window.crypto.subtle.decrypt(
-    { name: 'RSA-OAEP' },
-    session.privateKey,
-    encKeyBytes as BufferSource
-  )
+    const [headerB64, encryptedKeyB64, ivB64, ciphertextB64, tagB64] = parts
 
-  // 2. Importer la CEK pour AES-256-GCM
-  const aesKey = await window.crypto.subtle.importKey(
-    'raw',
-    cekBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  )
+    const encKeyBytes = base64UrlToBytes(encryptedKeyB64)
+    const ivBytes = base64UrlToBytes(ivB64)
+    const ciphertextBytes = base64UrlToBytes(ciphertextB64)
+    const tagBytes = base64UrlToBytes(tagB64)
 
-  // 3. Recombiner ciphertext + tag (16 octets) pour WebCrypto AES-GCM
-  const combined = new Uint8Array(ciphertextBytes.length + tagBytes.length)
-  combined.set(ciphertextBytes, 0)
-  combined.set(tagBytes, ciphertextBytes.length)
+    // 1. Déchiffrer la clé AES-256 (CEK) avec la clé privée RSA-OAEP-256 non-extractible
+    const cekBuffer = await window.crypto.subtle.decrypt(
+      { name: 'RSA-OAEP' },
+      session.privateKey,
+      encKeyBytes as BufferSource
+    )
 
-  const aad = new TextEncoder().encode(headerB64)
-  const plainBuffer = await window.crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv: ivBytes as BufferSource,
-      additionalData: aad,
-      tagLength: 128,
-    },
-    aesKey,
-    combined
-  )
+    // 2. Importer la CEK pour AES-256-GCM
+    const aesKey = await window.crypto.subtle.importKey(
+      'raw',
+      cekBuffer,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    )
 
-  const jsonText = new TextDecoder().decode(plainBuffer)
-  return JSON.parse(jsonText) as T
+    // 3. Recombiner ciphertext + tag (16 octets) pour WebCrypto AES-GCM
+    const combined = new Uint8Array(ciphertextBytes.length + tagBytes.length)
+    combined.set(ciphertextBytes, 0)
+    combined.set(tagBytes, ciphertextBytes.length)
+
+    const aad = new TextEncoder().encode(headerB64)
+    const plainBuffer = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: ivBytes as BufferSource,
+        additionalData: aad,
+        tagLength: 128,
+      },
+      aesKey,
+      combined
+    )
+
+    const jsonText = new TextDecoder().decode(plainBuffer)
+    return JSON.parse(jsonText) as T
+  } catch (err) {
+    console.warn('[JWE] Échec du déchiffrement JWE:', err)
+    return payload as T
+  }
 }

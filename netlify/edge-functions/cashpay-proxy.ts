@@ -77,6 +77,12 @@ async function buildJweResponse(
   headers: Record<string, string>,
   pubKeyB64Url: string | null
 ): Promise<Response> {
+  // Si le client n'a pas fourni de clé publique éphémère valide (ex: environnement sans WebCrypto, HTTP, etc.),
+  // on retourne directement la réponse en JSON standard non chiffré.
+  if (!pubKeyB64Url || !/^[A-Za-z0-9_-]{200,800}$/.test(pubKeyB64Url.trim())) {
+    return new Response(JSON.stringify(data), { status, headers })
+  }
+
   const publicKey = await resolveRecipientPublicKey(pubKeyB64Url)
   const protectedHeaderB64 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIn0"
   const aad = new TextEncoder().encode(protectedHeaderB64)

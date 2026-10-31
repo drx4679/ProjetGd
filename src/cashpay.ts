@@ -273,7 +273,13 @@ export async function deleteTrackedOrder(orderNumber: string, phone?: string): P
 export function generateMerchantRef(): string {
   const ts = Date.now()
   const arr = new Uint8Array(6)
-  window.crypto.getRandomValues(arr)
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(arr)
+  } else {
+    for (let i = 0; i < arr.length; i++) {
+      arr[i] = Math.floor(Math.random() * 256)
+    }
+  }
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   let rand = ''
   for (let i = 0; i < arr.length; i++) {

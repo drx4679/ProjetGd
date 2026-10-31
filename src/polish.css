@@ -9,10 +9,31 @@
 .skip-link { position: fixed; top: 10px; left: 10px; z-index: 100; transform: translateY(-160%); background: var(--color-ink); color: white; padding: 12px 18px; border-radius: 8px; font-size: 13px; }
 .skip-link:focus { transform: none; }
 .sticky-header { box-shadow: 0 1px 0 #1c455010, 0 8px 24px #163b5005; }
+.header {
+  gap: clamp(16px, 2.5vw, 36px);
+}
+.header .logo.shop-logo {
+  flex-shrink: 0;
+  margin-right: clamp(14px, 2.5vw, 32px);
+  font-size: clamp(20px, 2.2vw, 27px);
+}
+.header nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.8vw, 24px);
+  flex-shrink: 1;
+}
+.header nav button {
+  min-height: 36px;
+  white-space: nowrap;
+  transition: color .2s;
+}
+.header-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .header-actions > button { min-width: 36px; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: background .2s, color .2s; }
 .header-actions > button:hover { background: #e0f2fa; color: var(--color-accent); }
-.header nav { gap: 18px; }
-.header nav button { min-height: 36px; transition: color .2s; }
 .primary, .tracking-link { border-radius: 8px; transition: background .2s, box-shadow .2s, transform .2s; }
 .primary:hover { box-shadow: 0 6px 16px #087fb524; }
 .primary:active, .card-add:active { transform: scale(.98); }

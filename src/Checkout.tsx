@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import MapModal from './MapModal'
 import { formatMoney as money, freeDeliveryThreshold } from './money'
 import { createOrder, getOrderStatus, generateMerchantRef, type CashPayOrderItem } from './cashpay'
+import { sanitizeUserErrorMessage } from './errorSanitizer'
 
 export type PendingPaymentInfo = {
   orderRef: string
@@ -297,11 +298,11 @@ export default function Checkout({
       } else if (error?.status === 408 || error?.name === 'AbortError') {
         errorMsg = 'Le serveur de paiement met trop de temps à répondre. Vérifiez votre connexion.'
       } else if (error?.message && !String(error.message).includes('fetch')) {
-        errorMsg = String(error.message)
+        errorMsg = sanitizeUserErrorMessage(error, errorMsg)
       } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
         errorMsg = 'Pas de connexion internet. Vérifiez votre réseau.'
       }
-      setSubmitError(errorMsg)
+      setSubmitError(sanitizeUserErrorMessage(errorMsg, 'Erreur lors de la connexion au paiement. Veuillez réessayer.'))
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { formatMoney } from './money'
+import { sanitizeUserErrorMessage } from './errorSanitizer'
 import {
   trackOrders,
   deleteTrackedOrder,
@@ -187,7 +188,12 @@ export default function OrderTracking({
         }
       } catch (err: any) {
         if (!silent) {
-          setErrorMsg(err?.message || 'Impossible de récupérer le suivi pour le moment.')
+          setErrorMsg(
+            sanitizeUserErrorMessage(
+              err,
+              'Impossible de récupérer le suivi pour le moment. Veuillez vérifier vos informations ou réessayer.'
+            )
+          )
         }
       } finally {
         setLoading(false)
@@ -353,8 +359,10 @@ export default function OrderTracking({
     } catch (err: any) {
       setPayingOrderRef(null)
       setErrorMsg(
-        err?.message ||
+        sanitizeUserErrorMessage(
+          err,
           "Impossible d'ouvrir le portail CashPay pour le moment. Vous pouvez finaliser via l'assistance WhatsApp."
+        )
       )
     }
   }
@@ -376,7 +384,12 @@ export default function OrderTracking({
         } catch {}
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Impossible de supprimer cette commande.')
+      setErrorMsg(
+        sanitizeUserErrorMessage(
+          err,
+          'Impossible de supprimer cette commande pour le moment. Veuillez réessayer.'
+        )
+      )
       setConfirmDeleteRef(null)
     } finally {
       setDeletingRef(null)
