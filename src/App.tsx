@@ -8,6 +8,7 @@ import ModalShell from './ModalShell'
 import Checkout, { type PendingPaymentInfo } from './Checkout'
 import { formatMoney } from './money'
 import { useProducts, type Product } from './useProducts'
+import MedicalNeuralCanvas from './MedicalNeuralCanvas'
 
 const photos = {
   hero: '/IMG_8380.jpeg',
@@ -782,7 +783,10 @@ export default function App() {
       {currentView === 'cgv' && <Cgv onBack={() => navigateToView('home')} />}
       <div hidden={currentView !== 'home'}>
       <section className="hero">
-        <img src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" />
+        <img className="hero-photo" src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" />
+        <div className="hero-abstract" aria-hidden="true">
+          <MedicalNeuralCanvas />
+        </div>
         <div className="hero-shade"/>
         <div className="hero-content"><h1>L'empreinte<br/>de la Qualite.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande" onClick={(e) => { e.preventDefault(); navigateToView('tracking'); }}><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
         <div className="hero-bottom"><button className="ml-auto" aria-label="Découvrir nos gammes" onClick={() => go()}>↓</button></div>

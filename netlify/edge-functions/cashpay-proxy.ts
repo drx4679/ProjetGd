@@ -485,10 +485,31 @@ export default async (req: Request, context: Context) => {
 
       const responseText = await cpResponse.text()
 
+      // Parser la réponse CashPay (nécessaire dans tous les cas pour buildJweResponse)
+      let cashpayData: Record<string, any> = {}
+      try {
+        cashpayData = JSON.parse(responseText)
+      } catch {
+        // Si la réponse n'est pas du JSON valide, renvoyer l'erreur brute
+        if (!cpResponse.ok) {
+          return new Response(
+            JSON.stringify({ error: responseText || `Erreur CashPay (HTTP ${cpResponse.status})` }),
+            { status: cpResponse.status, headers: secHeaders }
+          )
+        }
+      }
+
+      // Si CashPay n'a pas créé la commande, renvoyer l'erreur
+      if (!cpResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: cashpayData?.message || cashpayData?.error || `Erreur CashPay (HTTP ${cpResponse.status})` }),
+          { status: cpResponse.status, headers: secHeaders }
+        )
+      }
+
       // Si CashPay a créé la commande, l'enregistrer immédiatement dans Supabase
-      if (cpResponse.ok && supabaseUrl && supabaseKey) {
+      if (supabaseUrl && supabaseKey) {
         try {
-          const cashpayData = JSON.parse(responseText)
           const existingOrderNumber =
             payload.existing_order_number && /^[\w-]+$/.test(String(payload.existing_order_number))
               ? String(payload.existing_order_number)

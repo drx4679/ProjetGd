@@ -18,6 +18,109 @@
 .primary:active, .card-add:active { transform: scale(.98); }
 .hero-content { animation: gentle-rise .65s ease-out both; }
 .hero-sticker { background: #e0f2fa; color: #086f9e; }
+
+/* ═══ HERO RÉSEAU NEURONAL MÉDICAL — tablette & PC (≥ 601px) ═══ */
+
+/* Par défaut (tablette/PC) : cacher l'image, montrer le réseau neuronal animé */
+.hero-photo {
+  display: none;
+}
+
+.hero-abstract {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.hero-neural-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Fond médical clair, lumineux, épuré et moderne */
+.hero {
+  background:
+    radial-gradient(ellipse 70% 60% at 85% 35%, rgba(14, 165, 233, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 20% 80%, rgba(8, 127, 181, 0.09) 0%, transparent 60%),
+    linear-gradient(140deg, #f8fafc 0%, #edf6fa 45%, #f1f8fc 80%, #ffffff 100%);
+  border-bottom: 1px solid #e1edf3;
+}
+
+/* Voile doux à gauche pour garantir une lisibilité absolue du texte */
+.hero-shade {
+  background: linear-gradient(
+    95deg,
+    rgba(248, 250, 252, 0.94) 0%,
+    rgba(248, 250, 252, 0.82) 42%,
+    rgba(248, 250, 252, 0.25) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Typographie contrastée et médicale sur PC / Tablette */
+@media (min-width: 601px) {
+  .hero-content h1 {
+    color: #0c202d !important;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  }
+  .hero-content > p {
+    color: #3e5666 !important;
+    font-weight: 450;
+  }
+  .hero-bottom {
+    color: #4b6371 !important;
+  }
+  .hero-bottom i {
+    background: #cbd5e1 !important;
+  }
+  .hero-bottom > button {
+    border-color: #087fb566 !important;
+    color: #087fb5 !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(8, 127, 181, 0.12);
+  }
+  .hero-bottom > button:hover {
+    background: #e0f2fa !important;
+    border-color: #087fb5 !important;
+  }
+  .hero .tracking-link {
+    background: #ffffff !important;
+    color: #087fb5 !important;
+    border: 1px solid #bfe0f0 !important;
+    box-shadow: 0 3px 12px rgba(8, 127, 181, 0.09) !important;
+  }
+  .hero .tracking-link:hover {
+    background: #f0f8fc !important;
+    border-color: #087fb5 !important;
+    box-shadow: 0 5px 16px rgba(8, 127, 181, 0.16) !important;
+  }
+  .hero-sticker {
+    background: #e0f2fa !important;
+    color: #086f9e !important;
+    border: 1px solid #b8e2f6 !important;
+    box-shadow: 0 4px 14px rgba(8, 111, 158, 0.1) !important;
+  }
+}
+
+/* ═══ MOBILE (≤ 600px) : garder l'image photo d'origine et son contraste ═══ */
+@media (max-width: 600px) {
+  .hero-photo {
+    display: block;
+  }
+  .hero-abstract {
+    display: none;
+  }
+  .hero {
+    background: #626254;
+    border-bottom: none;
+  }
+  .hero-shade {
+    background: linear-gradient(90deg, rgba(20, 26, 17, .77), rgba(20, 26, 17, .08) 80%);
+  }
+}
 .category { border-radius: 14px; }
 .category .circle-arrow { transition: background .2s, transform .2s; }
 .category:hover .circle-arrow { background: #ffffff25; transform: translateX(3px); }
