@@ -40,15 +40,29 @@
 .hero-content { animation: gentle-rise .65s ease-out both; }
 .hero-sticker { background: #e0f2fa; color: #086f9e; }
 
+/* ── Barre supérieure d'annonce (Noire & centrée) ── */
+.announcement {
+  background: #111111 !important;
+  color: #ffffff !important;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 5% !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+}
+
 /* ═══ HERO PHOTO CLASSIQUE — tablette & PC (≥ 601px) — même style que mobile ═══ */
 @media (min-width: 601px) {
-  /* Photo produit sombre comme sur mobile */
+  /* Photo produit sombre comme sur mobile - cadrage sur le visage */
   .hero-photo {
     display: block !important;
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
-    object-position: center 43% !important;
+    object-position: center top !important;
     filter: brightness(0.8) !important;
   }
 
@@ -127,7 +141,7 @@
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
-    object-position: center 43% !important;
+    object-position: center top !important;
     filter: brightness(0.8) !important;
   }
   .hero {
@@ -222,11 +236,14 @@
     box-shadow: none !important;
   }
   .announcement {
-    background: #30372d !important;
+    background: #111111 !important;
     color: #ffffff !important;
-    font-size: 9px !important;
+    font-size: 9.5px !important;
     text-align: center !important;
-    padding: 9px 3% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px 3% !important;
   }
 }
 .category { border-radius: 14px; }

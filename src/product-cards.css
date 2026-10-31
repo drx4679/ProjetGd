@@ -20,7 +20,7 @@
   margin: 7px;
   border-radius: 11px;
 }
-.modern-card .gallery-main { transition: transform .5s ease; }
+.modern-card .gallery-main { transition: transform .2s ease; }
 .modern-card:hover .gallery-main { transform: scale(1.035); }
 .modern-card .badge {
   top: 13px;

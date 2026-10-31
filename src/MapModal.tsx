@@ -277,8 +277,6 @@ export default function MapModal({
 
       map.invalidateSize()
       setTimeout(() => map.invalidateSize(), 150)
-
-      updatePosition(startLat, startLng)
     }
 
     const timer = setTimeout(init, 100)
