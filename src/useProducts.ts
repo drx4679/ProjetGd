@@ -31,6 +31,28 @@ function sanitizeImageUrl(raw: unknown): { url: string } | null {
   return null
 }
 
+/**
+ * Déduit la catégorie d'un article à partir de son nom quand la base renvoie
+ * null / '' / 'Général'.  Les mots-clés sont tirés du catalogue GoodDoctor's Shop.
+ */
+function inferCategory(name: string, rawCategory: string | null | undefined): string {
+  const cat = (rawCategory || '').trim()
+  if (cat && cat !== 'Général') return cat
+
+  const n = name.toUpperCase()
+
+  // Uniformes : vêtements / chaussures médicaux
+  if (/BLOUSE|CALOT|CHAUSSURE|SABOT|TUNIQUE|PANTALON/.test(n)) return 'Uniformes'
+
+  // Accessoires : étuis, montres, gestogrammes, coiffes, littmann accessoires
+  if (/ACCESSOIRE|ETUI|MONTRE|GESTOGRAMME|COIFFE/.test(n)) return 'Accessoires'
+
+  // Tout le reste → Dispositifs (gants, masques, cache-nez, kits, instruments…)
+  if (/GANT|CACHE[\s-]?NEZ|MASQUE|FIL DE SUTURE|KIT|BANDELETTE|STETHOSCOPE|TENSIOMETRE|THERMOMETRE|SPECULUM|OTOSCOPE|OXYMETRE|NEBULISATEUR|CATHETER|GARROT|LANCETTE|MARTEAU|MICROSCOPE|MONITEUR|DIAPASON|LAMPE|DETECTEUR|ECHO|RESPIRATEUR|PEAU DE SUTURE|CHRONOMETRE|GEL D|GLUCOMETRE|HEMOGLOBINOMETRE/.test(n)) return 'Dispositifs'
+
+  return 'Général'
+}
+
 function enrichProduct(base: Omit<Product, 'sizesList' | 'colorsList'>): Product {
   let sizesList = base.variantSizes
     ? Array.from(new Set(base.variantSizes.split(', ').map(s => s.trim()).filter(Boolean)))
@@ -75,7 +97,7 @@ function transformCatalog2Product(item: any): Product {
   }
 
   const name = item.name || 'Article sans nom'
-  const category = item.category || 'Général'
+  const category = inferCategory(name, item.category)
 
   const modelColors = Array.from(
     new Set(
@@ -148,7 +170,7 @@ function transformPublicProduct(item: any): Product {
   const colors = Array.isArray(item.color) ? item.color.filter(Boolean) : []
   const sizes = Array.isArray(item.size) ? item.size.filter(Boolean) : []
   const name = item.name || 'Article sans nom'
-  const category = item.category || 'Général'
+  const category = inferCategory(name, item.category)
 
   return enrichProduct({
     id: `PB-${item.id}`,

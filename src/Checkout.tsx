@@ -506,49 +506,6 @@ export default function Checkout({
             </div>
           </div>
 
-          {/* Case à cocher CGV & Politique de confidentialité */}
-          <div style={{ margin: '14px 0 6px', fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#475569' }}>
-            <input
-              type="checkbox"
-              id="agree-legal"
-              checked={agreeLegal}
-              onChange={e => {
-                setAgreeLegal(e.target.checked)
-                if (e.target.checked) setLegalWarning(false)
-              }}
-              style={{ marginTop: '3px' }}
-            />
-            <label htmlFor="agree-legal" style={{ margin: 0, fontWeight: 400, fontSize: '12px', cursor: 'pointer' }}>
-              J'ai lu et j'accepte la{' '}
-              <button
-                type="button"
-                onClick={() => onOpenLegal && onOpenLegal('privacy')}
-                style={{ textDecoration: 'underline', color: 'var(--color-accent, #087fb5)', background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Politique de confidentialité
-              </button>{' '}
-              et les{' '}
-              <button
-                type="button"
-                onClick={() => onOpenLegal && onOpenLegal('cgv')}
-                style={{ textDecoration: 'underline', color: 'var(--color-accent, #087fb5)', background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Conditions Générales de Vente
-              </button>.
-            </label>
-          </div>
-
-          {legalWarning && (
-            <div style={{ marginTop: '4px', marginBottom: '10px', padding: '10px 12px', borderRadius: '6px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontSize: '11.5px', fontWeight: 600 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>Veuillez cocher cette case pour accepter la Politique de confidentialité et les CGV avant de confirmer votre achat.</span>
-            </div>
-          )}
-
           {/* ═══ CADRE RÉSUMÉ & PAIEMENT CASHPAY (Copie textuelle D:\Ecom site web) ═══ */}
           <div className="ecom-summary-wrapper">
             {/* Résumé financier */}
@@ -598,6 +555,49 @@ export default function Checkout({
               </div>
               <p>Moov Money · Mixx · Coris Money · Carte bancaire (Visa, Mastercard)</p>
             </div>
+
+            {/* Case à cocher CGV & Politique de confidentialité */}
+            <div style={{ margin: '18px 2px 6px', fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#475569' }}>
+              <input
+                type="checkbox"
+                id="agree-legal"
+                checked={agreeLegal}
+                onChange={e => {
+                  setAgreeLegal(e.target.checked)
+                  if (e.target.checked) setLegalWarning(false)
+                }}
+                style={{ marginTop: '3px', cursor: 'pointer', flexShrink: 0 }}
+              />
+              <label htmlFor="agree-legal" style={{ margin: 0, fontWeight: 400, fontSize: '12px', cursor: 'pointer', lineHeight: '1.45' }}>
+                J'ai lu et j'accepte la{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('privacy')}
+                  style={{ textDecoration: 'underline', color: 'var(--color-accent, #087fb5)', background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Politique de confidentialité
+                </button>{' '}
+                et les{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('cgv')}
+                  style={{ textDecoration: 'underline', color: 'var(--color-accent, #087fb5)', background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Conditions Générales de Vente
+                </button>.
+              </label>
+            </div>
+
+            {legalWarning && (
+              <div style={{ marginTop: '4px', marginBottom: '8px', padding: '10px 12px', borderRadius: '6px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontSize: '11.5px', fontWeight: 600 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>Veuillez cocher cette case pour accepter la Politique de confidentialité et les CGV avant de confirmer votre achat.</span>
+              </div>
+            )}
 
             {/* Message d'erreur CashPay éventuel */}
             {submitError && (

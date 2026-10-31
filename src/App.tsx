@@ -13,7 +13,7 @@ const photos = {
   hero: '/IMG_8380.jpeg',
 }
 
-const placeholder = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=650&q=80'
+const placeholder = '/no-image.svg'
 
 const MEDICAL_PARTNERS = [
   '3M LITTMANN',

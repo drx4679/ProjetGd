@@ -18,6 +18,21 @@ export const config: Config = {
   path: "/api/products",
 }
 
+/**
+ * Déduit la catégorie d'un article à partir de son nom quand la base renvoie
+ * null / '' / 'Général'.  Même logique que côté client (useProducts.ts).
+ */
+function inferCategory(name: string, rawCategory: string | null | undefined): string {
+  const cat = (rawCategory || "").trim()
+  if (cat && cat !== "Général") return cat
+
+  const n = name.toUpperCase()
+  if (/BLOUSE|CALOT|CHAUSSURE|SABOT|TUNIQUE|PANTALON/.test(n)) return "Uniformes"
+  if (/ACCESSOIRE|ETUI|MONTRE|GESTOGRAMME|COIFFE/.test(n)) return "Accessoires"
+  if (/GANT|CACHE[\s-]?NEZ|MASQUE|FIL DE SUTURE|KIT|BANDELETTE|STETHOSCOPE|TENSIOMETRE|THERMOMETRE|SPECULUM|OTOSCOPE|OXYMETRE|NEBULISATEUR|CATHETER|GARROT|LANCETTE|MARTEAU|MICROSCOPE|MONITEUR|DIAPASON|LAMPE|DETECTEUR|ECHO|RESPIRATEUR|PEAU DE SUTURE|CHRONOMETRE|GEL D|GLUCOMETRE|HEMOGLOBINOMETRE/.test(n)) return "Dispositifs"
+  return "Général"
+}
+
 const rateMap = new Map<string, { start: number; count: number }>()
 
 function checkRateLimit(ip: string): boolean {
@@ -173,7 +188,7 @@ function sanitizeCatalog2Item(item: any) {
     name: item.name || "",
     description: item.description || "",
     price: item.price || 0,
-    category: item.category || "Général",
+    category: inferCategory(item.name || "", item.category),
     in_stock: Boolean(item.in_stock),
     is_featured: Boolean(item.is_featured),
     promotion_type: item.promotion_type || null,
@@ -211,7 +226,7 @@ function sanitizePublicItem(item: any) {
     promo_price: item.promo_price ?? null,
     promotion_type: item.promotion_type || null,
     promotion_value: item.promotion_value || 0,
-    category: item.category || "Général",
+    category: inferCategory(item.name || "", item.category),
     in_stock: Boolean(item.in_stock),
     is_featured: Boolean(item.is_featured),
     image_url: item.image_url || "",
