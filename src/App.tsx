@@ -884,6 +884,10 @@ export default function App() {
 
       {/* ── PARTENAIRES MÉDICAUX MARQUEE (comme sur l'ancien site) ── */}
       <section className="brands-marquee" aria-label="Nos partenaires médicaux officiels">
+        <div className="brands-header">
+          <p className="brands-eyebrow">Nos marques partenaires</p>
+          <p className="brands-subtitle">Des marques de référence mondiale, disponibles chez nous</p>
+        </div>
         <div className="marquee-track">
           {[0, 1].map(i => (
             <div className="marquee-content" key={i} aria-hidden={i > 0 ? 'true' : undefined}>
