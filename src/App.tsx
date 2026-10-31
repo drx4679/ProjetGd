@@ -488,6 +488,9 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const hasScrolledSearchRef = useRef(false)
   const [subscribed, setSubscribed] = useState(false)
+  const [newsletterEmail, setNewsletterEmail] = useState('')
+  const [newsletterLoading, setNewsletterLoading] = useState(false)
+  const [newsletterMessage, setNewsletterMessage] = useState<{ text: string; isError?: boolean } | null>(null)
   const [catalog, setCatalog] = useState(false)
   const [sort, setSort] = useState('featured')
   const [visibleCount, setVisibleCount] = useState(5)
@@ -823,7 +826,112 @@ export default function App() {
       )}
       {shown.length === 0 && <p className="empty">Aucun équipement ne correspond à votre recherche. Explorez les autres catégories du catalogue.</p>}</>}
       </section>
-      <section className="newsletter"><div><div className="eyebrow">LES ACTUALITÉS DE VOTRE ÉQUIPEMENT MÉDICAL</div><h2>Restez informés, équipez-vous mieux.</h2><p>Nouveaux uniformes, dispositifs, accessoires et offres pour les professionnels de santé.</p></div><form onSubmit={e => { e.preventDefault(); setSubscribed(true) }}><div><input maxLength={254} type="email" required aria-label="Votre adresse e-mail" placeholder="Votre adresse e-mail"/><button aria-label="S'inscrire"><Icon name="arrow"/></button></div><small>{subscribed ? "Merci ! Votre inscription a bien été prise en compte." : <>En vous inscrivant, vous acceptez notre <button type="button" onClick={() => navigateToView('privacy')} style={{ textDecoration: 'underline', background: 'none', border: 'none', color: 'inherit', font: 'inherit', padding: 0, cursor: 'pointer' }}>politique de confidentialité</button>.</>}</small></form></section>
+      <section className="newsletter">
+        <div>
+          <div className="eyebrow">LES ACTUALITÉS DE VOTRE ÉQUIPEMENT MÉDICAL</div>
+          <h2>Restez informés, équipez-vous mieux.</h2>
+          <p>Nouveaux uniformes, dispositifs, accessoires et offres pour les professionnels de santé.</p>
+        </div>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const email = newsletterEmail.trim()
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              setNewsletterMessage({ text: 'Veuillez saisir une adresse e-mail valide.', isError: true })
+              return
+            }
+
+            setNewsletterLoading(true)
+            setNewsletterMessage(null)
+
+            try {
+              const resp = await fetch('/api/newsletter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+              })
+              const data = await resp.json()
+              if (resp.ok && data?.success) {
+                setNewsletterEmail('')
+                setNewsletterMessage({ text: data.message || 'Merci ! Votre inscription a bien été prise en compte.' })
+                setSubscribed(true)
+              } else {
+                setNewsletterMessage({ text: data?.error || "Erreur lors de l'enregistrement. Réessayez.", isError: true })
+              }
+            } catch {
+              setNewsletterMessage({ text: 'Erreur réseau. Vérifiez votre connexion et réessayez.', isError: true })
+            } finally {
+              setNewsletterLoading(false)
+            }
+          }}
+        >
+          <div className="newsletter-field-wrap">
+            <input
+              maxLength={254}
+              type="email"
+              required
+              aria-label="Votre adresse e-mail"
+              placeholder="Votre adresse e-mail"
+              value={newsletterEmail}
+              onChange={(e) => {
+                setNewsletterEmail(e.target.value)
+                if (newsletterMessage) setNewsletterMessage(null)
+              }}
+              disabled={newsletterLoading}
+            />
+            <button
+              type="submit"
+              aria-label="S'inscrire à la newsletter"
+              disabled={newsletterLoading || !newsletterEmail.trim()}
+              className="newsletter-submit-btn"
+            >
+              {newsletterLoading ? (
+                <span className="newsletter-spinner" aria-hidden="true" />
+              ) : (
+                <Icon name="arrow" />
+              )}
+            </button>
+          </div>
+          {newsletterMessage ? (
+            <small
+              style={{
+                color: newsletterMessage.isError ? '#dc2626' : '#15803d',
+                fontWeight: 600,
+                display: 'block',
+                marginTop: '10px',
+                fontSize: '11px',
+              }}
+            >
+              {newsletterMessage.text}
+            </small>
+          ) : (
+            <small>
+              {subscribed ? (
+                "Merci ! Votre inscription a bien été prise en compte."
+              ) : (
+                <>
+                  En vous inscrivant, vous acceptez notre{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigateToView('privacy')}
+                    style={{
+                      textDecoration: 'underline',
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      font: 'inherit',
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    politique de confidentialité
+                  </button>.
+                </>
+              )}
+            </small>
+          )}
+        </form>
+      </section>
       </div>
     </main>
     <footer className="site-footer">
