@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { freeDeliveryThreshold } from './money'
 
+// Coordonnées du Siège GoodDoctor's Shop (Lomé, Togo) — exactement comme D:\Ecom site web
 const HQ_LAT = 6.193097
 const HQ_LNG = 1.203188
 
-// ── Haversine (fallback) ──
+// Haversine fallback (vol d'oiseau)
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const toRad = (d: number) => (d * Math.PI) / 180
+  const toRad = (deg: number) => (deg * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLng = toRad(lng2 - lng1)
   const a =
@@ -16,7 +16,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// ── Reverse geocoding Nominatim ──
+// Géocodage inversé via Nominatim (OSM) — traduit lat/lng en adresse lisible (exactement comme D:\Ecom site web)
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const res = await fetch(
@@ -35,43 +35,16 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
       const unique = [...new Set(parts)]
       return unique.join(', ') || data.display_name
     }
-  } catch {
-    /* fallback ci-dessous */
+  } catch (e: any) {
+    console.warn('[Geocode] Erreur reverse geocoding:', e?.message)
   }
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
 }
 
-// ── Distance et tracé OSRM ──
-async function fetchRouteInfo(
-  lat: number,
-  lng: number
-): Promise<{ distanceKm: number; geojson: any | null }> {
-  try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${HQ_LNG},${HQ_LAT};${lng},${lat}?overview=full&geometries=geojson`
-    )
-    const data = await res.json()
-    if (data.routes?.[0]) {
-      return {
-        distanceKm: data.routes[0].distance / 1000,
-        geojson: data.routes[0].geometry,
-      }
-    }
-  } catch {
-    /* fallback Haversine */
-  }
-  return {
-    distanceKm: haversineKm(HQ_LAT, HQ_LNG, lat, lng),
-    geojson: null,
-  }
-}
-
-// ── Lazy load Leaflet ──
-let leafletLoaded = false
+// Charger Leaflet JS + CSS de façon lazy (exactement comme D:\Ecom site web)
 function loadLeaflet(): Promise<void> {
   return new Promise(resolve => {
     if ((window as any).L) {
-      leafletLoaded = true
       resolve()
       return
     }
@@ -87,36 +60,12 @@ function loadLeaflet(): Promise<void> {
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
     script.crossOrigin = ''
-    script.onload = () => {
-      leafletLoaded = true
-      resolve()
-    }
+    script.onload = () => resolve()
     document.head.appendChild(script)
   })
 }
 
 type NominatimResult = { lat: string; lon: string; display_name: string }
-
-async function searchNominatim(query: string, limit = 5): Promise<NominatimResult[]> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        query + ' Togo'
-      )}&limit=${limit}&addressdetails=1`,
-      { headers: { 'Accept-Language': 'fr' } }
-    )
-    return await res.json()
-  } catch {
-    return []
-  }
-}
-
-export function computeDeliveryFee(distKm: number): { fee: number; label: string } {
-  if (distKm <= 10) return { fee: 1000, label: '1 000 FCFA' }
-  if (distKm <= 15) return { fee: 1500, label: '1 500 FCFA' }
-  if (distKm <= 20) return { fee: 2000, label: '2 000 FCFA' }
-  return { fee: 0, label: "Défini à l'expédition" }
-}
 
 export default function MapModal({
   open,
@@ -138,66 +87,60 @@ export default function MapModal({
   const markerRef = useRef<any>(null)
   const routeLayerRef = useRef<any>(null)
 
-  const [address, setAddress] = useState('')
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [distKm, setDistKm] = useState<number | null>(null)
-  const [calculating, setCalculating] = useState(false)
-  const [locating, setLocating] = useState(false)
+  const [addressText, setAddressText] = useState('')
+  const [showAddressPreview, setShowAddressPreview] = useState(false)
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [distanceKm, setDistanceKm] = useState<number>(0)
+
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const autoTimerRef = useRef<number | null>(null)
 
-  const updatePosition = useCallback(async (lat: number, lng: number) => {
-    setCoords({ lat, lng })
-    setCalculating(true)
-    setAddress("Localisation et calcul de l'itinéraire…")
+  // Mettre à jour l'aperçu adresse dans la modale ET tracer le trajet (exactement comme D:\Ecom site web)
+  const updateMapAddressPreview = async (lat: number, lng: number) => {
+    setSelectedCoords({ lat, lng })
+    setShowAddressPreview(true)
+    setAddressText('Localisation et calcul du trajet...')
 
-    try {
-      const [addr, routeInfo] = await Promise.all([
-        reverseGeocode(lat, lng),
-        fetchRouteInfo(lat, lng),
-      ])
+    const addr = await reverseGeocode(lat, lng)
+    setAddressText(addr)
 
-      setAddress(addr)
-      setDistKm(routeInfo.distanceKm)
+    let dist = haversineKm(HQ_LAT, HQ_LNG, lat, lng)
 
-      // Mise à jour instantanée du panier et du paiement en temps réel (sans attendre de confirmer)
-      onRealtimeUpdate?.(lat, lng, addr, routeInfo.distanceKm)
-
-      const L = (window as any).L
-      if (L && mapInstanceRef.current) {
-        if (routeLayerRef.current) {
-          mapInstanceRef.current.removeLayer(routeLayerRef.current)
-          routeLayerRef.current = null
-        }
-        if (routeInfo.geojson) {
-          routeLayerRef.current = L.geoJSON(routeInfo.geojson, {
+    const L = (window as any).L
+    if (L && mapInstanceRef.current) {
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${HQ_LNG},${HQ_LAT};${lng},${lat}?overview=full&geometries=geojson`
+        )
+        const data = await res.json()
+        if (data.routes && data.routes.length > 0) {
+          if (routeLayerRef.current) {
+            mapInstanceRef.current.removeLayer(routeLayerRef.current)
+          }
+          routeLayerRef.current = L.geoJSON(data.routes[0].geometry, {
             style: {
-              color: '#0284c7',
+              color: '#3b82f6', // bleu
               weight: 5,
-              opacity: 0.85,
-              dashArray: '8, 8',
+              opacity: 0.7,
+              dashArray: '10, 10',
             },
           }).addTo(mapInstanceRef.current)
 
           mapInstanceRef.current.fitBounds(routeLayerRef.current.getBounds(), {
-            padding: [45, 45],
-            maxZoom: 16,
+            padding: [30, 30],
           })
+          dist = data.routes[0].distance / 1000
         }
+      } catch (e: any) {
+        console.warn('[Map] Erreur tracé itinéraire:', e?.message)
       }
-    } catch {
-      const fallbackAddr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-      const fallbackDist = haversineKm(HQ_LAT, HQ_LNG, lat, lng)
-      setAddress(fallbackAddr)
-      setDistKm(fallbackDist)
-      onRealtimeUpdate?.(lat, lng, fallbackAddr, fallbackDist)
-    } finally {
-      setCalculating(false)
     }
-  }, [onRealtimeUpdate])
+    setDistanceKm(dist)
+  }
 
+  // Initialisation de la carte Leaflet (exactement comme initLeafletMap dans D:\Ecom site web)
   useEffect(() => {
     if (!open) {
       if (mapInstanceRef.current) {
@@ -206,6 +149,11 @@ export default function MapModal({
         markerRef.current = null
         routeLayerRef.current = null
       }
+      setShowAddressPreview(false)
+      setAddressText('')
+      setSelectedCoords(null)
+      setShowSuggestions(false)
+      setSearchQuery('')
       return
     }
 
@@ -218,65 +166,79 @@ export default function MapModal({
       const L = (window as any).L
       if (!L) return
 
-      const startLat = initialCoords?.lat || HQ_LAT
-      const startLng = initialCoords?.lng || HQ_LNG
+      const hasCoords = Boolean(initialCoords && initialCoords.lat && initialCoords.lng)
+      const startLat = hasCoords ? (initialCoords as any).lat : HQ_LAT
+      const startLng = hasCoords ? (initialCoords as any).lng : HQ_LNG
 
       const map = L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false,
-      }).setView([startLat, startLng], initialCoords ? 15 : 14)
+      }).setView([startLat, startLng], 15)
 
       L.control.zoom({ position: 'bottomright' }).addTo(map)
       L.control
         .attribution({ position: 'bottomleft', prefix: false })
         .addTo(map)
-        .addAttribution('© <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>')
+        .addAttribution('© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>')
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         subdomains: 'abc',
       }).addTo(map)
 
-      // Marqueur Siège GD (vert)
+      // Marqueur pour le Siège (HQ) — vert, animé
       const hqIcon = L.divIcon({
         className: '',
-        html: '<div style="width:32px;height:32px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 12px rgba(16,185,129,.45);border:2.5px solid white;display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:10px;color:white;font-weight:800;letter-spacing:-.5px">GD</span></div>',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32],
+        html: `<div style="width:34px;height:34px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 14px rgba(16,185,129,.45);border:2.5px solid white;display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:10px;color:white;font-weight:800;letter-spacing:-.5px">GD</span></div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 34],
+        popupAnchor: [0, -34],
       })
-      L.marker([HQ_LAT, HQ_LNG], { icon: hqIcon })
-        .addTo(map)
-        .bindPopup(
-          "<div style=\"text-align:center;font-family:system-ui;padding:2px\"><strong style=\"font-size:12px;color:#0f172a\">GoodDoctor's Shop</strong><br><span style=\"font-size:10px;color:#64748b\">Siège — Lomé, Togo</span></div>"
-        )
+      const hq = L.marker([HQ_LAT, HQ_LNG], { icon: hqIcon, interactive: true }).addTo(map)
+      hq.bindPopup(
+        `<div style="text-align:center;font-family:system-ui"><b style="font-size:13px">GoodDoctor's Shop</b><br><span style="font-size:11px;color:#6b7280">Siège — Lomé, Togo</span></div>`
+      )
 
-      // Marqueur livraison (bleu indigo avec aura animée)
-      const deliveryIcon = L.divIcon({
+      // Marqueur personnalisé bleu/violet pour la livraison — déplaçable, avec animation pulse
+      const icon = L.divIcon({
         className: '',
-        html: '<div style="position:relative"><div style="position:absolute;top:2px;left:2px;width:36px;height:36px;background:rgba(2,132,199,.25);border-radius:50%;animation:pulse 2s infinite"></div><div style="position:relative;width:40px;height:40px;background:linear-gradient(135deg,#0284c7,#0369a1);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 14px rgba(2,132,199,.4);border:2.5px solid white;display:flex;align-items:center;justify-content:center"><svg style="transform:rotate(45deg)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div></div>',
+        html: `<div style="position:relative">
+          <div style="position:absolute;top:2px;left:2px;width:36px;height:36px;background:rgba(99,102,241,.3);border-radius:50%;animation:pulse 2s infinite"></div>
+          <div style="position:relative;width:40px;height:40px;background:linear-gradient(135deg,#6366f1,#7c3aed);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 14px rgba(99,102,241,.45);border:3px solid white;display:flex;align-items:center;justify-content:center">
+            <svg style="transform:rotate(45deg)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+        </div>`,
         iconSize: [40, 40],
         iconAnchor: [20, 40],
       })
-      const marker = L.marker([startLat, startLng], { icon: deliveryIcon, draggable: true }).addTo(map)
+
+      const marker = L.marker([startLat, startLng], { icon, draggable: true }).addTo(map)
       markerRef.current = marker
 
-      marker.on('dragend', (e: any) => {
+      // Géocodage inversé quand on déplace le marqueur
+      marker.on('dragend', async (e: any) => {
         const { lat, lng } = e.target.getLatLng()
-        updatePosition(lat, lng)
+        await updateMapAddressPreview(lat, lng)
       })
 
-      map.on('click', (e: any) => {
+      // Clic sur la carte = déplacer le marqueur + fermer suggestions
+      map.on('click', async (e: any) => {
+        setShowSuggestions(false)
         const { lat, lng } = e.latlng
         marker.setLatLng([lat, lng])
-        updatePosition(lat, lng)
-        setShowSuggestions(false)
+        await updateMapAddressPreview(lat, lng)
       })
 
       mapInstanceRef.current = map
 
+      // Invalider taille après affichage pour affichage correct
       map.invalidateSize()
       setTimeout(() => map.invalidateSize(), 150)
+
+      // Aperçu initial uniquement si on a déjà des coordonnées sauvegardées
+      if (hasCoords) {
+        await updateMapAddressPreview(startLat, startLng)
+      }
     }
 
     const timer = setTimeout(init, 100)
@@ -290,295 +252,262 @@ export default function MapModal({
         routeLayerRef.current = null
       }
     }
-  }, [open, initialCoords, updatePosition])
+  }, [open, initialCoords])
 
-  const handleSearchInput = (val: string) => {
-    setSearchQuery(val)
+  // Autocomplete : suggestions live (debounce 400ms)
+  const handleMapAutocomplete = (value: string) => {
+    setSearchQuery(value)
     if (autoTimerRef.current) clearTimeout(autoTimerRef.current)
-    if (val.trim().length < 3) {
-      setSuggestions([])
+    const query = value.trim()
+    if (query.length < 3) {
       setShowSuggestions(false)
+      setSuggestions([])
       return
     }
     autoTimerRef.current = window.setTimeout(async () => {
-      const results = await searchNominatim(val)
-      setSuggestions(results)
-      setShowSuggestions(results.length > 0)
-    }, 350)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query + ' Togo'
+          )}&limit=5&addressdetails=1`,
+          { headers: { 'Accept-Language': 'fr' } }
+        )
+        const results = await res.json()
+        setSuggestions(results || [])
+        setShowSuggestions(true)
+      } catch {
+        setShowSuggestions(false)
+      }
+    }, 400)
   }
 
-  const selectSuggestion = (r: NominatimResult) => {
+  // Sélectionner une suggestion autocomplete
+  const selectMapSuggestion = async (lat: number, lon: number) => {
     setShowSuggestions(false)
     setSuggestions([])
     setSearchQuery('')
-    const lat = parseFloat(r.lat)
-    const lng = parseFloat(r.lon)
     if (mapInstanceRef.current && markerRef.current) {
-      mapInstanceRef.current.setView([lat, lng], 16)
-      markerRef.current.setLatLng([lat, lng])
+      mapInstanceRef.current.setView([lat, lon], 16)
+      markerRef.current.setLatLng([lat, lon])
+      await updateMapAddressPreview(lat, lon)
     }
-    updatePosition(lat, lng)
   }
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return
+  // Recherche d'adresse via Nominatim (bouton / Enter)
+  const searchMapAddress = async () => {
+    const query = searchQuery.trim()
+    if (!query || !mapInstanceRef.current) return
     setShowSuggestions(false)
-    const results = await searchNominatim(searchQuery, 1)
-    if (results.length > 0) selectSuggestion(results[0])
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query + ' Togo'
+        )}&limit=1`,
+        { headers: { 'Accept-Language': 'fr' } }
+      )
+      const results = await res.json()
+      if (results && results.length > 0) {
+        const lat = parseFloat(results[0].lat)
+        const lon = parseFloat(results[0].lon)
+        mapInstanceRef.current.setView([lat, lon], 16)
+        if (markerRef.current) markerRef.current.setLatLng([lat, lon])
+        await updateMapAddressPreview(lat, lon)
+      }
+    } catch (e: any) {
+      console.warn('[Map] Erreur recherche adresse:', e?.message)
+    }
   }
 
-  const handleGPS = () => {
-    if (!navigator.geolocation) return
-    setLocating(true)
+  // Utiliser la position GPS du navigateur (Me localiser)
+  const useMyLocation = () => {
     setShowSuggestions(false)
+    if (!navigator.geolocation) {
+      alert("La géolocalisation n'est pas supportée par votre navigateur.")
+      return
+    }
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: lat, longitude: lng } = pos.coords
+      async pos => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
         if (mapInstanceRef.current && markerRef.current) {
           mapInstanceRef.current.setView([lat, lng], 16)
           markerRef.current.setLatLng([lat, lng])
+          await updateMapAddressPreview(lat, lng)
         }
-        updatePosition(lat, lng)
-        setLocating(false)
       },
       () => {
-        setLocating(false)
+        alert("Impossible d'obtenir votre position. Vérifiez les permissions GPS.")
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
+  // Confirmer la localisation choisie (comme confirmMapLocation dans D:\Ecom site web)
+  const confirmMapLocation = () => {
+    if (!selectedCoords) {
+      onClose()
+      return
+    }
+    onConfirm(selectedCoords.lat, selectedCoords.lng, addressText, distanceKm)
+    onClose()
+  }
+
   if (!open) return null
 
-  const isFreeDelivery = subtotal >= freeDeliveryThreshold
-  const currentFee = distKm !== null ? computeDeliveryFee(distKm) : null
-  const displayFeeLabel = isFreeDelivery
-    ? 'Livraison Offerte'
-    : currentFee?.label || '1 000 FCFA'
-
   return createPortal(
-    <div className="map-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Choisir le point de livraison">
-      <div className="map-modal-panel" onClick={e => e.stopPropagation()}>
-        {/* Poignée mobile */}
-        <div className="map-modal-handle" />
+    <div
+      id="map-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Carte de localisation"
+      className="fixed inset-0 z-[9999]"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+        onClick={onClose}
+      />
 
-        {/* En-tête ergonomique */}
-        <div className="map-modal-header">
-          <div>
-            <div className="map-modal-eyebrow">LIVRAISON TOGO &amp; ENVOIS INTERNATIONAUX</div>
-            <h3>Point de livraison</h3>
-            <p className="map-modal-subtitle">
-              Déplacez le repère bleu ou cliquez sur la carte pour ajuster votre point exact
-            </p>
-          </div>
-          <button
-            type="button"
-            className="map-modal-close"
-            onClick={onClose}
-            aria-label="Fermer la carte"
-            title="Fermer"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Barre GPS & Recherche */}
-        <div className="map-modal-actions">
-          <button
-            type="button"
-            className={`map-btn-gps ${locating ? 'loading' : ''}`}
-            onClick={handleGPS}
-            disabled={locating}
-            title="Utiliser ma position actuelle"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span>{locating ? 'Localisation…' : 'Me localiser'}</span>
-          </button>
-
-          <div className="map-search-box">
-            <svg
-              className="map-search-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              className="map-search-input"
-              placeholder="Rechercher un quartier (Tokoin, Bè, Hedzranawoé…)"
-              value={searchQuery}
-              onChange={e => handleSearchInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleSearch()
-                }
-              }}
-              autoComplete="off"
-            />
-            {searchQuery && (
+      {/* Panneau */}
+      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center md:p-6 pointer-events-none">
+        <div
+          className="bg-white dark:bg-zinc-950 w-full md:max-w-2xl rounded-t-3xl md:rounded-2xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden"
+          style={{ height: '85dvh', maxHeight: '700px' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header modale & Actions */}
+          <div className="flex flex-col gap-4 px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex-shrink-0 relative z-10 bg-white dark:bg-zinc-950 rounded-t-3xl md:rounded-none">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Point de livraison</h3>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-1">Ajustez le marqueur sur la carte</p>
+              </div>
               <button
                 type="button"
-                className="map-search-clear"
-                onClick={() => {
-                  setSearchQuery('')
-                  setSuggestions([])
-                  setShowSuggestions(false)
-                }}
-                aria-label="Effacer la recherche"
+                onClick={onClose}
+                className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-2 transition-colors cursor-pointer"
+                aria-label="Fermer"
               >
-                ✕
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
-            )}
+            </div>
+
+            {/* Actions unifiées */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={useMyLocation}
+                className="flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors w-full sm:w-auto flex-shrink-0 border border-blue-100 dark:border-blue-800 cursor-pointer"
+              >
+                <svg className="w-4 h-4 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span>Me localiser</span>
+              </button>
+
+              <div className="flex items-center gap-2 flex-1 relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Rechercher un quartier..."
+                  autoComplete="off"
+                  className="w-full pl-9 pr-12 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                  value={searchQuery}
+                  onChange={e => handleMapAutocomplete(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      searchMapAddress()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={searchMapAddress}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center z-10 cursor-pointer"
+                  aria-label="Rechercher"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+
+                {/* Suggestions autocomplete */}
+                {showSuggestions && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {suggestions.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-zinc-400 italic">Aucun résultat</p>
+                    ) : (
+                      suggestions.map((r, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`w-full text-left px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors flex items-start gap-3 cursor-pointer ${
+                            i > 0 ? 'border-t border-zinc-100 dark:border-zinc-800' : ''
+                          }`}
+                          onClick={() => selectMapSuggestion(parseFloat(r.lat), parseFloat(r.lon))}
+                        >
+                          <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          <span className="line-clamp-2 text-xs">{r.display_name}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Adresse trouvée (aperçu) */}
+          {showAddressPreview && (
+            <div className="px-4 py-2.5 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900 flex-shrink-0 flex items-center gap-2">
+              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium truncate">
+                {addressText}
+              </p>
+            </div>
+          )}
+
+          {/* Carte Leaflet */}
+          <div ref={mapContainerRef} className="flex-1 w-full relative z-0" style={{ minHeight: '300px' }} />
+
+          {/* Footer modale */}
+          <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 flex-shrink-0 bg-white dark:bg-zinc-950">
             <button
               type="button"
-              className="map-search-submit"
-              onClick={handleSearch}
-              aria-label="Rechercher"
+              onClick={onClose}
+              className="flex-1 py-3 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-sm font-semibold hover:border-zinc-400 rounded-xl transition-colors cursor-pointer"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              Annuler
             </button>
-
-            {/* Suggestions auto */}
-            {showSuggestions && (
-              <div className="map-suggestions">
-                {suggestions.map((r, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className="map-suggestion-item"
-                    onClick={() => selectSuggestion(r)}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    <span>{r.display_name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Aperçu adresse sélectionnée avec badge de synchronisation automatique */}
-        {address && (
-          <div className="map-address-preview">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <p title={address}>{address}</p>
-            <span className="map-live-tag">
-              <span className="map-live-dot" />
-              Synchronisé en direct
-            </span>
-          </div>
-        )}
-
-        {/* Conteneur Leaflet avec badge prix flottant et bouton de recentrage */}
-        <div className="map-view-wrapper">
-          <div ref={mapContainerRef} className="map-leaflet-container" />
-
-          {/* Badge flottant en temps réel sur la carte */}
-          <div className="map-floating-price-card" role="status" aria-live="polite">
-            <div className="map-live-header">
-              <span className={`map-live-indicator ${calculating ? 'pulsing' : 'active'}`} />
-              <span className="map-live-title">
-                {calculating ? 'Calcul de distance en cours…' : 'Frais de livraison instantanés'}
-              </span>
-            </div>
-            <div className="map-live-body">
-              <strong className="map-live-price">{displayFeeLabel}</strong>
-              {distKm !== null && (
-                <span className="map-live-distance">
-                  {distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`} du siège
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Bouton recentrer sur le Siège GoodDoctor's */}
-          <button
-            type="button"
-            className="map-recenter-hq-btn"
-            onClick={() => {
-              if (mapInstanceRef.current) {
-                mapInstanceRef.current.setView([HQ_LAT, HQ_LNG], 15)
-              }
-            }}
-            title="Recentrer la carte sur le siège GoodDoctor's Shop"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-            <span>Siège GD</span>
-          </button>
-        </div>
-
-        {/* Pied de page */}
-        <div className="map-modal-footer">
-          <button type="button" className="map-btn-cancel" onClick={onClose}>
-            Fermer
-          </button>
-          <button
-            type="button"
-            className="map-btn-confirm"
-            disabled={!coords || calculating}
-            onClick={() => {
-              if (coords && distKm !== null) {
-                onConfirm(coords.lat, coords.lng, address, distKm)
-              } else {
-                onClose()
-              }
-            }}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <button
+              type="button"
+              onClick={confirmMapLocation}
+              disabled={!selectedCoords}
+              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-500/20"
             >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>
-              Confirmer cette adresse · {displayFeeLabel}
-            </span>
-          </button>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Confirmer cette adresse</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>,

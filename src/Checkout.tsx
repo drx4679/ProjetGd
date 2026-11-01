@@ -91,14 +91,6 @@ export default function Checkout({
     setMapOpen(false)
   }
 
-  // Mise à jour instantanée des frais de livraison en direct pendant que l'utilisateur déplace le repère
-  const handleRealtimeMapUpdate = useCallback((lat: number, lng: number, addr: string, distKm: number) => {
-    setDeliveryCoords({ lat, lng })
-    setDeliveryDistanceKm(distKm)
-    setClientAddress(addr)
-    setAcceptOutOfZone(false)
-  }, [])
-
   const isTogoOrder = phoneCountryCode === '+228'
   const isOutOfZone = isTogoOrder && deliveryDistanceKm !== null && deliveryDistanceKm > 20
 
@@ -756,14 +748,12 @@ export default function Checkout({
         </div>
       )}
 
-      {/* Modale Carte interactive Leaflet avec mise à jour des frais en temps réel */}
+      {/* Modale Carte interactive Leaflet (conforme D:\Ecom site web) */}
       <MapModal
         open={mapOpen}
         initialCoords={deliveryCoords}
-        subtotal={subtotal}
         onClose={() => setMapOpen(false)}
         onConfirm={handleMapConfirm}
-        onRealtimeUpdate={handleRealtimeMapUpdate}
       />
     </div>
   )
