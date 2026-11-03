@@ -37,7 +37,8 @@
 .primary, .tracking-link { border-radius: 8px; transition: background .2s, box-shadow .2s, transform .2s; }
 .primary:hover { box-shadow: 0 6px 16px #087fb524; }
 .primary:active, .card-add:active { transform: scale(.98); }
-.hero-content { animation: gentle-rise .65s ease-out both; }
+.hero-content { animation: gentle-rise .65s ease-out both; z-index: 2; }
+.hero-cta { position: relative; z-index: 2; }
 .hero-sticker { background: #e0f2fa; color: #086f9e; }
 
 /* ── Barre supérieure d'annonce (Noire & centrée) ── */
