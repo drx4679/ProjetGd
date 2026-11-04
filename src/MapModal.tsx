@@ -51,7 +51,7 @@ function loadLeaflet(): Promise<void> {
     if (!document.querySelector('link[href*="leaflet.css"]')) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      link.href = '/vendor/leaflet/leaflet.css'
       link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
       link.crossOrigin = 'anonymous'
       document.head.appendChild(link)
@@ -70,7 +70,8 @@ function loadLeaflet(): Promise<void> {
       return
     }
     const script = document.createElement('script')
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    // Leaflet 1.9.4 auto-hébergé (/public/vendor/leaflet) : plus de dépendance à un CDN tiers
+    script.src = '/vendor/leaflet/leaflet.js'
     script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
     script.crossOrigin = 'anonymous'
     script.onload = () => resolve()

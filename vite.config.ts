@@ -122,10 +122,10 @@ function gdSecurityPlugin(): Plugin {
   const SUPABASE = 'https://jhybjpetiotzbtkfbxkr.supabase.co'
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://unpkg.com https://static.cloudflareinsights.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com https://wsrv.nl`,
+    `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://wsrv.nl`,
     `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org https://cloudflareinsights.com https://*.cloudflareinsights.com`,
     "frame-src 'self'",
     "object-src 'none'",
