@@ -86,16 +86,16 @@ export default function Privacy({ onBack }: PrivacyProps) {
         <div>
           <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>3</span>
-            Sécurité des paiements &amp; Partenaires de confiance
+            Sécurité des paiements &amp; Protection des données
           </h2>
           <p>
             <strong>Aucune coordonnée bancaire, aucun code secret T-Money, Moov Money ou numéro de carte ne transite ni n'est stocké sur nos serveurs.</strong>
           </p>
           <p style={{ marginTop: "8px" }}>
-            L'ensemble des transactions financières est délégué à notre partenaire agréé <strong>CashPay (SEMOA Togo)</strong> via des protocoles de chiffrement bancaire sécurisés (JWE - JSON Web Encryption RSA-OAEP-256 et AES-256-GCM).
+            L'ensemble des transactions financières est délégué à notre partenaire agréé <strong>CashPay</strong> via des protocoles de chiffrement bancaire sécurisés et certifiés.
           </p>
           <p style={{ marginTop: "8px" }}>
-            Pour l'hébergement sécurisé de nos bases de données, nous faisons appel à <strong>Supabase</strong>, qui applique des restrictions d'accès de niveau bancaire (Row Level Security - RLS). Vos données ne sont accessibles qu'au personnel habilité à l'acheminement de votre commande.
+            Nos serveurs et bases de données bénéficient d'un hébergement hautement sécurisé appliquant des contrôles d'accès stricts et un chiffrement renforcé. Vos données ne sont accessibles qu'au personnel habilité à la préparation, à l'acheminement et au suivi de votre commande.
           </p>
         </div>
 

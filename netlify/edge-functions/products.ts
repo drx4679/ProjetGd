@@ -289,31 +289,13 @@ export default async (req: Request, context: Context) => {
     }
 
     const clientPubKey = req.headers.get("x-pub-key")
-    if (clientPubKey && /^[A-Za-z0-9_-]{200,800}$/.test(clientPubKey.trim())) {
-      const jwe = await encryptPayloadAsJwe(payload, clientPubKey)
-      return new Response(
-        JSON.stringify(
-          {
-            success: true,
-            encrypted: true,
-            jwe,
-          },
-          null,
-          4
-        ),
-        {
-          status: 200,
-          headers: secHeaders,
-        }
-      )
-    }
-
+    const jwe = await encryptPayloadAsJwe(payload, clientPubKey)
     return new Response(
       JSON.stringify(
         {
           success: true,
-          encrypted: false,
-          ...payload,
+          encrypted: true,
+          jwe,
         },
         null,
         4

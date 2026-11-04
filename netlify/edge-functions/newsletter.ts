@@ -48,9 +48,20 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export default async (req: Request, context: Context) => {
+  const reqOrigin = (() => {
+    try {
+      return new URL(req.url).origin
+    } catch {
+      return ""
+    }
+  })()
+  const configuredSiteUrl = (getEnv("SITE_URL") || "https://gooddoctorsshop.com").replace(/\/+$/, "")
+
   const secHeaders: Record<string, string> = {
     "Content-Type": "application/json; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
   }
 
@@ -59,7 +70,7 @@ export default async (req: Request, context: Context) => {
       status: 204,
       headers: {
         ...secHeaders,
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": reqOrigin || configuredSiteUrl,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       },
@@ -73,6 +84,29 @@ export default async (req: Request, context: Context) => {
     })
   }
 
+  const originHeader = (req.headers.get("origin") || "").replace(/\/+$/, "")
+  const isLocalHostTarget = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(reqOrigin)
+  if (!originHeader && !isLocalHostTarget) {
+    return new Response(JSON.stringify({ error: "Origin manquante" }), {
+      status: 403,
+      headers: secHeaders,
+    })
+  }
+  if (originHeader) {
+    const isAllowedOrigin =
+      originHeader === reqOrigin ||
+      originHeader === configuredSiteUrl ||
+      /^https:\/\/[a-z0-9-]+--wegd\.netlify\.app$/i.test(originHeader) ||
+      originHeader === "https://wegd.netlify.app" ||
+      (isLocalHostTarget && /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(originHeader))
+    if (!isAllowedOrigin) {
+      return new Response(JSON.stringify({ error: "Origin non autorisée" }), {
+        status: 403,
+        headers: secHeaders,
+      })
+    }
+  }
+
   const clientIp = context?.ip || "127.0.0.1"
   if (!checkRateLimit(clientIp)) {
     return new Response(
@@ -83,10 +117,16 @@ export default async (req: Request, context: Context) => {
 
   try {
     const raw = await req.text()
+    if (raw.length > 4096) {
+      return new Response(JSON.stringify({ error: "Requête trop volumineuse." }), {
+        status: 413,
+        headers: secHeaders,
+      })
+    }
     const body = raw ? JSON.parse(raw) : {}
     const rawEmail = String(body?.email || "").trim().toLowerCase()
 
-    if (!rawEmail || !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(rawEmail)) {
+    if (!rawEmail || rawEmail.length > 254 || !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(rawEmail)) {
       return new Response(
         JSON.stringify({ error: "Veuillez saisir une adresse e-mail valide." }),
         { status: 400, headers: secHeaders }

@@ -146,10 +146,10 @@ export default function OrderTracking({
       const fullPhone = normalizePhoneInput(code, searchPhoneRaw)
       const phoneDigits = fullPhone.replace(/\D/g, '')
 
-      if (phoneDigits.length < 6 && cleanRef.length < 4) {
+      if (phoneDigits.length < 8 && cleanRef.length < 8) {
         if (!silent) {
           setErrorMsg(
-            'Veuillez saisir votre numéro de téléphone (ex: 90 00 00 00) ou votre référence de commande (ex: GDS-...).'
+            'Veuillez saisir votre numéro de téléphone (ex: 90 00 00 00) ou votre référence de commande complète (ex: GDS-...).'
           )
         }
         return
@@ -164,7 +164,7 @@ export default function OrderTracking({
       }
 
       try {
-        const found = await trackOrders(phoneDigits.length >= 6 ? fullPhone : '', cleanRef)
+        const found = await trackOrders(phoneDigits.length >= 8 ? fullPhone : '', cleanRef)
         setOrders(found)
         setLastSyncTime(
           new Date().toLocaleTimeString('fr-FR', {

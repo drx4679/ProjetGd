@@ -77,12 +77,6 @@ async function buildJweResponse(
   headers: Record<string, string>,
   pubKeyB64Url: string | null
 ): Promise<Response> {
-  // Si le client n'a pas fourni de clé publique éphémère valide (ex: environnement sans WebCrypto, HTTP, etc.),
-  // on retourne directement la réponse en JSON standard non chiffré.
-  if (!pubKeyB64Url || !/^[A-Za-z0-9_-]{200,800}$/.test(pubKeyB64Url.trim())) {
-    return new Response(JSON.stringify(data), { status, headers })
-  }
-
   const publicKey = await resolveRecipientPublicKey(pubKeyB64Url)
   const protectedHeaderB64 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIn0"
   const aad = new TextEncoder().encode(protectedHeaderB64)
@@ -286,13 +280,20 @@ export default async (req: Request, context: Context) => {
 
   // Vérification CSRF / Origin : bloque les appels POST depuis un site tiers
   const originHeader = (req.headers.get("origin") || "").replace(/\/+$/, "")
+  const isLocalHostTarget = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(reqOrigin)
+  if (!originHeader && !isLocalHostTarget) {
+    return new Response(JSON.stringify({ error: "Origin manquante" }), {
+      status: 403,
+      headers: secHeaders,
+    })
+  }
   if (originHeader) {
     const isAllowedOrigin =
       originHeader === reqOrigin ||
       originHeader === configuredSiteUrl ||
       /^https:\/\/[a-z0-9-]+--wegd\.netlify\.app$/i.test(originHeader) ||
       originHeader === "https://wegd.netlify.app" ||
-      /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(originHeader)
+      (isLocalHostTarget && /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(originHeader))
     if (!isAllowedOrigin) {
       return new Response(JSON.stringify({ error: "Origin non autorisée" }), {
         status: 403,
@@ -387,75 +388,181 @@ export default async (req: Request, context: Context) => {
         })
       }
 
-      // Vérification du prix côté serveur (articles catalog2 + products)
+      const existingOrderNumber =
+        payload.existing_order_number && /^[\w-]+$/.test(String(payload.existing_order_number))
+          ? String(payload.existing_order_number)
+          : null
+
+      // Vérification du prix côté serveur (articles catalog2 + products ou commande existante)
       let verifiedAmount = Math.round(amount)
-      if (supabaseUrl && supabaseKey && Array.isArray(payload.items) && payload.items.length > 0) {
-        try {
-          const [cat2Res, pubRes] = await Promise.all([
-            fetch(`${supabaseUrl}/rest/v1/rpc/get_catalog2_articles`, {
-              method: "POST",
-              headers: {
-                apikey: supabaseKey,
-                Authorization: `Bearer ${supabaseKey}`,
-                "Content-Type": "application/json",
-              },
-              body: "{}",
-              signal: AbortSignal.timeout(6000),
-            }).catch(() => null),
-            fetch(`${supabaseUrl}/rest/v1/rpc/get_public_products`, {
-              method: "POST",
-              headers: {
-                apikey: supabaseKey,
-                Authorization: `Bearer ${supabaseKey}`,
-                "Content-Type": "application/json",
-              },
-              body: "{}",
-              signal: AbortSignal.timeout(6000),
-            }).catch(() => null),
-          ])
 
-          const priceMap = new Map<string, number>()
-          if (cat2Res?.ok) {
-            const cat2 = await cat2Res.json()
-            if (Array.isArray(cat2)) {
-              for (const row of cat2) {
-                const name = String(row.title || row.name || "").trim().toLowerCase()
-                const price = Number(row.promo_price || row.price || row.unit_price || 0)
-                if (name && price > 0) priceMap.set(name, price)
-              }
-            }
+      if (existingOrderNumber && supabaseUrl && supabaseKey) {
+        const encExisting = encodeURIComponent(existingOrderNumber)
+        const checkResp = await fetch(
+          `${supabaseUrl}/rest/v1/orders?or=(order_number.eq.${encExisting},merchant_reference.eq.${encExisting})&select=id,customer_phone,total_amount,final_amount,payment_status&limit=1`,
+          {
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+            },
+            signal: AbortSignal.timeout(6000),
           }
-          if (pubRes?.ok) {
-            const pub = await pubRes.json()
-            if (Array.isArray(pub)) {
-              for (const row of pub) {
-                const name = String(row.name || row.title || "").trim().toLowerCase()
-                const price = Number(row.promo_price || row.price || 0)
-                if (name && price > 0) priceMap.set(name, price)
-              }
-            }
-          }
+        )
+        const existingRows = checkResp.ok ? await checkResp.json() : []
+        const existingOrder = Array.isArray(existingRows) ? existingRows[0] : null
+        if (!existingOrder) {
+          return new Response(JSON.stringify({ error: "Commande introuvable" }), {
+            status: 404,
+            headers: secHeaders,
+          })
+        }
+        if (String(existingOrder.payment_status || "").toLowerCase() === "paid") {
+          return new Response(JSON.stringify({ error: "Cette commande a déjà été réglée" }), {
+            status: 409,
+            headers: secHeaders,
+          })
+        }
+        const callerDigits = String(client?.phone || "").replace(/\D/g, "")
+        const ownerDigits = String(existingOrder.customer_phone || "").replace(/\D/g, "")
+        if (ownerDigits.length >= 8 && (callerDigits.length < 8 || callerDigits.slice(-8) !== ownerDigits.slice(-8))) {
+          return new Response(JSON.stringify({ error: "Non autorisé : le numéro ne correspond pas à la commande" }), {
+            status: 403,
+            headers: secHeaders,
+          })
+        }
+        const dbTotal = Math.round(Number(existingOrder.final_amount || existingOrder.total_amount || 0))
+        if (dbTotal > 0) {
+          verifiedAmount = Math.max(verifiedAmount, dbTotal)
+        }
+      } else {
+        if (!Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 50) {
+          return new Response(JSON.stringify({ error: "Le panier est vide ou invalide" }), {
+            status: 400,
+            headers: secHeaders,
+          })
+        }
 
-          if (priceMap.size > 0) {
-            let serverItemsTotal = 0
-            let allFound = true
-            for (const item of payload.items) {
-              const itemName = String(item?.name || "").trim().toLowerCase()
-              const dbPrice = priceMap.get(itemName)
-              if (dbPrice !== undefined) {
-                const qty = Math.min(99, Math.max(1, Math.round(Number(item.quantity) || 1)))
-                serverItemsTotal += dbPrice * qty
-              } else {
-                allFound = false
-                break
+        if (supabaseUrl && supabaseKey) {
+          try {
+            const [cat2Res, pubRes] = await Promise.all([
+              fetch(`${supabaseUrl}/rest/v1/rpc/get_catalog2_articles`, {
+                method: "POST",
+                headers: {
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${supabaseKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: "{}",
+                signal: AbortSignal.timeout(6000),
+              }).catch(() => null),
+              fetch(`${supabaseUrl}/rest/v1/rpc/get_public_products`, {
+                method: "POST",
+                headers: {
+                  apikey: supabaseKey,
+                  Authorization: `Bearer ${supabaseKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: "{}",
+                signal: AbortSignal.timeout(6000),
+              }).catch(() => null),
+            ])
+
+            const priceMap = new Map<string, number>()
+            if (cat2Res?.ok) {
+              const cat2 = await cat2Res.json()
+              if (Array.isArray(cat2)) {
+                for (const row of cat2) {
+                  let price = Number(row.price || row.unit_price || 0)
+                  if (!price && Array.isArray(row.models) && row.models.length > 0) {
+                    const m = row.models[0]
+                    price = Number(m?.sale_price || 0)
+                    if (!price && Array.isArray(m?.colors) && m.colors.length > 0) {
+                      const c = m.colors[0]
+                      price = Number(c?.sale_price || 0)
+                      if (!price && Array.isArray(c?.sizes) && c.sizes.length > 0) {
+                        price = Number(c.sizes[0]?.sale_price || 0)
+                      }
+                    }
+                  }
+                  if (row.promotion_type && Number(row.promotion_value) > 0 && price > 0) {
+                    if (row.promotion_type === "percent") {
+                      price = Math.round(price * (1 - Number(row.promotion_value) / 100))
+                    } else if (row.promotion_type === "amount") {
+                      price = Math.max(0, price - Number(row.promotion_value))
+                    }
+                  }
+                  const name = String(row.title || row.name || "").trim().toLowerCase()
+                  const rawId = row._original_id || row.id
+                  if (price > 0) {
+                    if (name) priceMap.set(name, price)
+                    if (rawId !== undefined) priceMap.set(`c2-${String(rawId).toLowerCase()}`, price)
+                  }
+                }
               }
             }
-            if (allFound && serverItemsTotal > 0 && verifiedAmount < serverItemsTotal) {
-              verifiedAmount = Math.round(serverItemsTotal)
+            if (pubRes?.ok) {
+              const pub = await pubRes.json()
+              if (Array.isArray(pub)) {
+                for (const row of pub) {
+                  let price = Number(row.price || 0)
+                  if (row.promo_price && Number(row.promo_price) > 0 && Number(row.promo_price) < price) {
+                    price = Number(row.promo_price)
+                  } else if (row.promotion_type && Number(row.promotion_value) > 0 && price > 0) {
+                    if (row.promotion_type === "percent") {
+                      price = Math.round(price * (1 - Number(row.promotion_value) / 100))
+                    } else if (row.promotion_type === "amount") {
+                      price = Math.max(0, price - Number(row.promotion_value))
+                    }
+                  }
+                  const name = String(row.name || row.title || "").trim().toLowerCase()
+                  const rawId = row.id
+                  if (price > 0) {
+                    if (name) priceMap.set(name, price)
+                    if (rawId !== undefined) priceMap.set(`pb-${String(rawId).toLowerCase()}`, price)
+                  }
+                }
+              }
             }
+
+            if (priceMap.size > 0) {
+              let serverItemsTotal = 0
+              let allFound = true
+              for (const item of payload.items) {
+                const itemId = String(item?.id || "").trim().toLowerCase()
+                const itemName = String(item?.name || "").trim().toLowerCase()
+                const dbPrice = (itemId && priceMap.get(itemId)) ?? priceMap.get(itemName)
+                if (dbPrice !== undefined) {
+                  const qty = Math.min(99, Math.max(1, Math.round(Number(item.quantity) || 1)))
+                  item.price = dbPrice
+                  item.quantity = qty
+                  serverItemsTotal += dbPrice * qty
+                } else {
+                  allFound = false
+                  break
+                }
+              }
+              if (!allFound) {
+                return new Response(
+                  JSON.stringify({ error: "Un ou plusieurs articles du panier sont introuvables ou invalides." }),
+                  { status: 400, headers: secHeaders }
+                )
+              }
+              if (serverItemsTotal > 0) {
+                const clientDeliveryFee =
+                  typeof payload.delivery_fee === "number" && payload.delivery_fee > 0
+                    ? Math.round(payload.delivery_fee)
+                    : 0
+                const minSubtotalWithDelivery = serverItemsTotal + clientDeliveryFee
+                const minOperatorFee = Math.round(minSubtotalWithDelivery * 0.015)
+                const minExpectedTotal = minSubtotalWithDelivery + minOperatorFee
+                if (verifiedAmount < minExpectedTotal) {
+                  verifiedAmount = minExpectedTotal
+                }
+              }
+            }
+          } catch {
+            // Repli sur verifiedAmount en cas d'indisponibilité temporaire du RPC catalogue
           }
-        } catch {
-          // On conserve verifiedAmount si la vérification échoue
         }
       }
 
@@ -711,9 +818,10 @@ export default async (req: Request, context: Context) => {
       const isPaid = cpPaid || dbPaid
       return await buildJweResponse(
         {
-          ...cpData,
           paid: isPaid,
           payment_status: isPaid ? "paid" : dbPaymentStatus,
+          status: isPaid ? "paid" : dbPaymentStatus,
+          order_reference: ref,
         },
         200,
         secHeaders,
@@ -736,12 +844,13 @@ export default async (req: Request, context: Context) => {
       const rawRef = String(body?.orderRef || body?.orderNumber || "").trim()
 
       const digitsOnly = rawPhone.replace(/\D/g, "")
-      const cleanRef = rawRef.replace(/[^a-zA-Z0-9\-_]/g, "")
+      // On retire également '_' pour empêcher qu'il agisse comme joker SQL dans ILIKE
+      const cleanRef = rawRef.replace(/[^a-zA-Z0-9\-]/g, "")
 
-      if (digitsOnly.length < 6 && cleanRef.length < 4) {
+      if (digitsOnly.length < 8 && cleanRef.length < 8) {
         return new Response(
           JSON.stringify({
-            error: "Veuillez renseigner un numéro de téléphone ou une référence de commande valide.",
+            error: "Veuillez renseigner un numéro de téléphone valide (au moins 8 chiffres) ou une référence de commande complète.",
           }),
           { status: 400, headers: secHeaders }
         )
@@ -774,19 +883,15 @@ export default async (req: Request, context: Context) => {
         "paid_at",
         "shipped_at",
         "delivered_at",
-        "delivery_lat",
-        "delivery_lng",
-        "delivery_latitude",
-        "delivery_longitude",
       ].join(",")
 
       let queryUrl = `${supabaseUrl}/rest/v1/orders?select=${selectCols}&order=created_at.desc&limit=25`
 
-      const last8 = digitsOnly.length >= 8 ? digitsOnly.slice(-8) : digitsOnly
-      if (cleanRef && last8.length >= 6) {
+      const last8 = digitsOnly.length >= 8 ? digitsOnly.slice(-8) : ""
+      if (cleanRef.length >= 8 && last8.length === 8) {
         const encRef = encodeURIComponent(cleanRef)
         queryUrl += `&or=(order_number.ilike.${encRef},merchant_reference.ilike.${encRef},cashpay_order_ref.ilike.${encRef})&customer_phone=ilike.*${encodeURIComponent(last8)}*`
-      } else if (cleanRef) {
+      } else if (cleanRef.length >= 8) {
         const encRef = encodeURIComponent(cleanRef)
         queryUrl += `&or=(order_number.ilike.${encRef},merchant_reference.ilike.${encRef},cashpay_order_ref.ilike.${encRef})`
       } else {
@@ -837,7 +942,7 @@ export default async (req: Request, context: Context) => {
 
       const encRef = encodeURIComponent(orderNumber)
       const lookupResp = await fetch(
-        `${supabaseUrl}/rest/v1/orders?or=(order_number.eq.${encRef},merchant_reference.eq.${encRef})&select=id,order_number,customer_phone,is_shipped,is_delivered&limit=1`,
+        `${supabaseUrl}/rest/v1/orders?or=(order_number.eq.${encRef},merchant_reference.eq.${encRef})&select=id,order_number,customer_phone,payment_status,status,is_shipped,is_delivered&limit=1`,
         {
           headers: {
             apikey: supabaseKey,
@@ -863,13 +968,28 @@ export default async (req: Request, context: Context) => {
         })
       }
 
-      // Si la commande a un téléphone enregistré et que le client a fourni un téléphone, vérifier les 8 derniers chiffres
+      // Interdire la suppression d'une commande déjà payée, expédiée ou livrée
+      const pStatus = String(order.payment_status || "").toLowerCase()
+      const oStatus = String(order.status || "").toLowerCase()
+      if (
+        order.is_shipped ||
+        order.is_delivered ||
+        pStatus === "paid" ||
+        ["paid", "shipped", "delivered", "completed"].includes(oStatus)
+      ) {
+        return new Response(
+          JSON.stringify({ error: "Impossible de supprimer une commande déjà payée, expédiée ou livrée." }),
+          { status: 403, headers: secHeaders }
+        )
+      }
+
+      // Vérification obligatoire des 8 derniers chiffres du numéro de téléphone associé à la commande
       const inputDigits = phone.replace(/\D/g, "")
       const orderDigits = String(order.customer_phone || "").replace(/\D/g, "")
-      if (orderDigits.length >= 8 && inputDigits.length >= 8) {
-        if (inputDigits.slice(-8) !== orderDigits.slice(-8)) {
+      if (orderDigits.length >= 8) {
+        if (inputDigits.length < 8 || inputDigits.slice(-8) !== orderDigits.slice(-8)) {
           return new Response(
-            JSON.stringify({ error: "Non autorisé : ce numéro ne correspond pas à la commande" }),
+            JSON.stringify({ error: "Non autorisé : veuillez renseigner le numéro de téléphone associé à cette commande." }),
             { status: 403, headers: secHeaders }
           )
         }

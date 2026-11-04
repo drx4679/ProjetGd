@@ -107,7 +107,7 @@ export default function Cgv({ onBack }: CgvProps) {
             Modalités de paiement sécurisé (CashPay)
           </h2>
           <p>
-            Le règlement s'effectue en ligne via la plateforme agréée <strong>CashPay (SEMOA Togo)</strong>. Plusieurs moyens de règlement sont mis à votre disposition :
+            Le règlement s'effectue en ligne via la plateforme agréée <strong>CashPay</strong>. Plusieurs moyens de règlement sont mis à votre disposition :
           </p>
           <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
             <li><strong>Mobile Money Togo &amp; Sous-région :</strong> Moov Money, Mixx by Yas (T-Money), Coris Money.</li>

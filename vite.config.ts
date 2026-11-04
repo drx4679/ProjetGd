@@ -104,6 +104,7 @@ function gdLocalApiPlugin(): Plugin {
 
       mountEdgeFunction('/api/products', '/netlify/edge-functions/products.ts')
       mountEdgeFunction('/api/cashpay-proxy', '/netlify/edge-functions/cashpay-proxy.ts')
+      mountEdgeFunction('/api/newsletter', '/netlify/edge-functions/newsletter.ts')
       mountEdgeFunction('/p', '/netlify/edge-functions/og-preview.ts')
     },
   }

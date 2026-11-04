@@ -53,13 +53,18 @@ function loadLeaflet(): Promise<void> {
       link.rel = 'stylesheet'
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
       link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
-      link.crossOrigin = ''
+      link.crossOrigin = 'anonymous'
       document.head.appendChild(link)
+    }
+    const existingScript = document.querySelector('script[src*="leaflet.js"]') as HTMLScriptElement | null
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(), { once: true })
+      return
     }
     const script = document.createElement('script')
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
-    script.crossOrigin = ''
+    script.crossOrigin = 'anonymous'
     script.onload = () => resolve()
     document.head.appendChild(script)
   })
