@@ -62,6 +62,7 @@ export default async (req: Request, context: Context) => {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "Cache-Control": "no-store",
   }
 
@@ -148,10 +149,10 @@ export default async (req: Request, context: Context) => {
         body: JSON.stringify({ email: rawEmail }),
       })
 
-      // Code 409 : L'e-mail existe déjà dans la table
+      // Code 409 : L'e-mail existe déjà — réponse identique pour empêcher l'énumération d'adresses
       if (sbResp.status === 409) {
         return new Response(
-          JSON.stringify({ success: true, message: "Vous êtes déjà inscrit aux actualités !" }),
+          JSON.stringify({ success: true, message: "Merci ! Votre inscription a bien été prise en compte." }),
           { status: 200, headers: secHeaders }
         )
       }

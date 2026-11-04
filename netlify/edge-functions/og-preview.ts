@@ -8,11 +8,24 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "X-Permitted-Cross-Domain-Policies": "none",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self), payment=(), usb=()",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://wsrv.nl https://jhybjpetiotzbtkfbxkr.supabase.co; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+  "Vary": "User-Agent",
 }
 
-export default async (request: Request, context: Context): Promise<Response> => {
+function escapeHtmlAttr(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+export default async (request: Request, _context: Context): Promise<Response> => {
   const url = new URL(request.url)
 
   // Extraire le productId (/p/C2-138 -> C2-138)
@@ -20,8 +33,8 @@ export default async (request: Request, context: Context): Promise<Response> => 
   const pathParts = cleanPath.split("/")
   const rawProductId = pathParts[pathParts.length - 1]
 
-  // Sanitize: n'autoriser que lettres, chiffres, tirets et underscores
-  const productId = (rawProductId || "").replace(/[^a-zA-Z0-9\-_]/g, "")
+  // Sanitize: n'autoriser que lettres, chiffres, tirets et underscores (max 80 caractères)
+  const productId = (rawProductId || "").replace(/[^a-zA-Z0-9\-_]/g, "").slice(0, 80)
 
   if (!productId || productId === "p") {
     return new Response(null, { status: 302, headers: { ...SECURITY_HEADERS, Location: "/" } })
@@ -179,13 +192,14 @@ export default async (request: Request, context: Context): Promise<Response> => 
     // - Recadre en 800x800 sur fond blanc
     // - Convertit en JPEG ultra-léger (~50 KB)
     // - Compatible à 100% avec les exigences strictes de WhatsApp (taille < 300 KB, format JPEG)
-    const ogImageUrl = imageUrl
-      ? `https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}&w=800&h=800&fit=contain&bg=ffffff&output=jpg&q=80`
+    const validHttpsImage = /^https:\/\/[^\s"'<>]+$/i.test(imageUrl) ? imageUrl : ""
+    const ogImageUrl = validHttpsImage
+      ? `https://wsrv.nl/?url=${encodeURIComponent(validHttpsImage)}&w=800&h=800&fit=contain&bg=ffffff&output=jpg&q=80`
       : `${baseUrl}/logo.png`
 
     const shareUrl = `${baseUrl}/p/${productId}`
-    const safeTitle = title.replace(/"/g, "&quot;").replace(/</g, "&lt;")
-    const safeDesc = description.substring(0, 200).replace(/"/g, "&quot;").replace(/</g, "&lt;")
+    const safeTitle = escapeHtmlAttr(title)
+    const safeDesc = escapeHtmlAttr(description.substring(0, 200))
 
     const html = `<!DOCTYPE html>
 <html lang="fr" prefix="og: https://ogp.me/ns#">

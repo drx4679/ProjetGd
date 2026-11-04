@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import MapModal from './MapModal'
 import { formatMoney as money, freeDeliveryThreshold } from './money'
-import { createOrder, getOrderStatus, generateMerchantRef, type CashPayOrderItem } from './cashpay'
+import { createOrder, getOrderStatus, generateMerchantRef, isTrustedCashPayUrl, type CashPayOrderItem } from './cashpay'
 import { sanitizeUserErrorMessage } from './errorSanitizer'
 
 export type PendingPaymentInfo = {
@@ -269,7 +269,7 @@ export default function Checkout({
       } catch {}
 
       // Rediriger vers le portail de paiement sécurisé CashPay
-      if (billUrl && billUrl.startsWith('https://')) {
+      if (billUrl && isTrustedCashPayUrl(billUrl)) {
         setLoadingLabel('Redirection vers CashPay…')
         window.location.href = billUrl
         return
@@ -711,7 +711,7 @@ export default function Checkout({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {orderInfo?.billUrl && orderInfo.billUrl.startsWith('https://') && (
+                {orderInfo?.billUrl && isTrustedCashPayUrl(orderInfo.billUrl) && (
                   <a
                     href={orderInfo.billUrl}
                     className="ecom-confirm-btn"

@@ -253,6 +253,7 @@ export default async (req: Request, context: Context) => {
 
   const secHeaders: Record<string, string> = {
     "Content-Type": "application/json; charset=utf-8",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
@@ -350,29 +351,45 @@ export default async (req: Request, context: Context) => {
         })
       }
 
-      if (!merchant_reference || typeof merchant_reference !== "string" || !/^[\w-]+$/.test(merchant_reference)) {
+      if (
+        !merchant_reference ||
+        typeof merchant_reference !== "string" ||
+        merchant_reference.length > 80 ||
+        !/^[\w-]+$/.test(merchant_reference)
+      ) {
         return new Response(JSON.stringify({ error: "Référence de commande invalide" }), {
           status: 400,
           headers: secHeaders,
         })
       }
 
+      const existingOrderNumber =
+        payload.existing_order_number &&
+        String(payload.existing_order_number).length <= 80 &&
+        /^[\w-]+$/.test(String(payload.existing_order_number))
+          ? String(payload.existing_order_number)
+          : null
+
       if (client) {
         const cleanedPhone = String(client.phone || "").replace(/[\s\-().]/g, "")
-        if (!/^\+?\d{8,15}$/.test(cleanedPhone)) {
+        if (!existingOrderNumber && !/^\+?\d{8,15}$/.test(cleanedPhone)) {
           return new Response(JSON.stringify({ error: "Numéro de téléphone invalide" }), {
             status: 400,
             headers: secHeaders,
           })
         }
-        client.phone = cleanedPhone.startsWith("+") ? cleanedPhone : `+${cleanedPhone}`
-        if (client.firstname) client.firstname = String(client.firstname).substring(0, 100)
-        if (client.lastname) client.lastname = String(client.lastname).substring(0, 100)
-        if (client.address1) client.address1 = String(client.address1).substring(0, 300)
+        if (/^\+?\d{8,15}$/.test(cleanedPhone)) {
+          client.phone = cleanedPhone.startsWith("+") ? cleanedPhone : `+${cleanedPhone}`
+        }
+        if (client.firstname) client.firstname = String(client.firstname).replace(/[<>]/g, "").trim().substring(0, 100)
+        if (client.lastname) client.lastname = String(client.lastname).replace(/[<>]/g, "").trim().substring(0, 100)
+        if (client.address1) client.address1 = String(client.address1).replace(/[<>]/g, "").trim().substring(0, 300)
+        if (client.city) client.city = String(client.city).replace(/[<>]/g, "").trim().substring(0, 80)
+        if (client.country) client.country = String(client.country).replace(/[<>]/g, "").trim().substring(0, 80)
       }
 
       if (payload.description) {
-        payload.description = String(payload.description).substring(0, 200)
+        payload.description = String(payload.description).replace(/[<>]/g, "").substring(0, 200)
       }
 
       // Paralléliser l'obtention du token OAuth2 CashPay et la vérification anti-doublon
@@ -387,11 +404,6 @@ export default async (req: Request, context: Context) => {
           headers: secHeaders,
         })
       }
-
-      const existingOrderNumber =
-        payload.existing_order_number && /^[\w-]+$/.test(String(payload.existing_order_number))
-          ? String(payload.existing_order_number)
-          : null
 
       // Vérification du prix côté serveur (articles catalog2 + products ou commande existante)
       let verifiedAmount = Math.round(amount)
@@ -424,11 +436,19 @@ export default async (req: Request, context: Context) => {
         }
         const callerDigits = String(client?.phone || "").replace(/\D/g, "")
         const ownerDigits = String(existingOrder.customer_phone || "").replace(/\D/g, "")
-        if (ownerDigits.length >= 8 && (callerDigits.length < 8 || callerDigits.slice(-8) !== ownerDigits.slice(-8))) {
+        const isMaskedPhone = /[•*]/.test(String(client?.phone || ""))
+        if (
+          !isMaskedPhone &&
+          ownerDigits.length >= 8 &&
+          (callerDigits.length < 8 || callerDigits.slice(-8) !== ownerDigits.slice(-8))
+        ) {
           return new Response(JSON.stringify({ error: "Non autorisé : le numéro ne correspond pas à la commande" }), {
             status: 403,
             headers: secHeaders,
           })
+        }
+        if (client && existingOrder.customer_phone) {
+          client.phone = String(existingOrder.customer_phone)
         }
         const dbTotal = Math.round(Number(existingOrder.final_amount || existingOrder.total_amount || 0))
         if (dbTotal > 0) {
@@ -441,6 +461,25 @@ export default async (req: Request, context: Context) => {
             headers: secHeaders,
           })
         }
+
+        // Nettoyer et normaliser chaque article du panier (liste blanche de champs)
+        payload.items = payload.items.map((rawItem: any) => {
+          const cleanStr = (v: unknown, max: number) =>
+            typeof v === "string" ? v.replace(/[<>]/g, "").trim().substring(0, max) : ""
+          const cleanOpt = (v: unknown, max: number) => {
+            const s = cleanStr(v, max)
+            return s || null
+          }
+          return {
+            ...(rawItem?.id ? { id: cleanStr(rawItem.id, 80) } : {}),
+            name: cleanStr(rawItem?.name, 160) || "Article",
+            quantity: Math.min(99, Math.max(1, Math.round(Number(rawItem?.quantity) || 1))),
+            price: Math.max(0, Math.round(Number(rawItem?.price) || 0)),
+            ...(rawItem?.selectedColor ? { selectedColor: cleanOpt(rawItem.selectedColor, 60) } : {}),
+            ...(rawItem?.selectedSize ? { selectedSize: cleanOpt(rawItem.selectedSize, 40) } : {}),
+            ...(rawItem?.variant ? { variant: cleanOpt(rawItem.variant, 80) } : {}),
+          }
+        })
 
         if (supabaseUrl && supabaseKey) {
           try {
@@ -603,19 +642,20 @@ export default async (req: Request, context: Context) => {
       try {
         cashpayData = JSON.parse(responseText)
       } catch {
-        // Si la réponse n'est pas du JSON valide, renvoyer l'erreur brute
         if (!cpResponse.ok) {
           return new Response(
-            JSON.stringify({ error: responseText || `Erreur CashPay (HTTP ${cpResponse.status})` }),
+            JSON.stringify({ error: `Service de paiement momentanément indisponible (HTTP ${cpResponse.status}).` }),
             { status: cpResponse.status, headers: secHeaders }
           )
         }
       }
 
-      // Si CashPay n'a pas créé la commande, renvoyer l'erreur
+      // Si CashPay n'a pas créé la commande, renvoyer un message propre
       if (!cpResponse.ok) {
         return new Response(
-          JSON.stringify({ error: cashpayData?.message || cashpayData?.error || `Erreur CashPay (HTTP ${cpResponse.status})` }),
+          JSON.stringify({
+            error: `Impossible d'initialiser le paiement CashPay (HTTP ${cpResponse.status}). Veuillez vérifier vos informations et réessayer.`,
+          }),
           { status: cpResponse.status, headers: secHeaders }
         )
       }
@@ -624,7 +664,9 @@ export default async (req: Request, context: Context) => {
       if (supabaseUrl && supabaseKey) {
         try {
           const existingOrderNumber =
-            payload.existing_order_number && /^[\w-]+$/.test(String(payload.existing_order_number))
+            payload.existing_order_number &&
+            String(payload.existing_order_number).length <= 80 &&
+            /^[\w-]+$/.test(String(payload.existing_order_number))
               ? String(payload.existing_order_number)
               : null
 
@@ -674,6 +716,12 @@ export default async (req: Request, context: Context) => {
               typeof payload.delivery_fee === "number" && payload.delivery_fee > 0
                 ? Math.round(payload.delivery_fee)
                 : 0
+            const rawLat = Number(payload.delivery_lat)
+            const rawLng = Number(payload.delivery_lng)
+            const validLat =
+              Number.isFinite(rawLat) && rawLat >= -90 && rawLat <= 90 ? rawLat : null
+            const validLng =
+              Number.isFinite(rawLng) && rawLng >= -180 && rawLng <= 180 ? rawLng : null
 
             const orderRecord = {
               order_number: merchant_reference,
@@ -694,10 +742,10 @@ export default async (req: Request, context: Context) => {
               merchant_reference: merchant_reference,
               payment_status: "pending",
               status: "pending",
-              delivery_latitude: payload.delivery_lat || null,
-              delivery_longitude: payload.delivery_lng || null,
-              delivery_lat: payload.delivery_lat || null,
-              delivery_lng: payload.delivery_lng || null,
+              delivery_latitude: validLat,
+              delivery_longitude: validLng,
+              delivery_lat: validLat,
+              delivery_lng: validLng,
             }
 
             await fetch(`${supabaseUrl}/rest/v1/orders`, {
@@ -724,7 +772,7 @@ export default async (req: Request, context: Context) => {
     // ══════════════════════════════════════════════════════════════
     if (action === "check_status") {
       const ref = String(orderReference || statusMerchantRef || "").trim()
-      if (!ref || !/^[\w-]+$/.test(ref)) {
+      if (!ref || ref.length > 80 || !/^[\w-]+$/.test(ref)) {
         return new Response(JSON.stringify({ error: "Référence invalide" }), {
           status: 400,
           headers: secHeaders,
@@ -914,7 +962,24 @@ export default async (req: Request, context: Context) => {
       }
 
       const rows = await sbResp.json()
-      const orders = Array.isArray(rows) ? rows : []
+      const rawOrders = Array.isArray(rows) ? rows : []
+
+      // Si la recherche est faite uniquement par référence (sans le téléphone client),
+      // masquer partiellement le numéro de téléphone pour protéger les données personnelles (RGPD / PII).
+      const orders =
+        last8.length === 8
+          ? rawOrders
+          : rawOrders.map((o: any) => {
+              const ph = String(o?.customer_phone || "").trim()
+              const maskedPhone =
+                ph.length > 6
+                  ? `${ph.slice(0, 4)} •••• ${ph.slice(-2)}`
+                  : ph
+              return {
+                ...o,
+                customer_phone: maskedPhone,
+              }
+            })
 
       return await buildJweResponse({ orders }, 200, secHeaders, req.headers.get("x-pub-key"))
     }

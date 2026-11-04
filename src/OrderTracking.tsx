@@ -5,6 +5,7 @@ import {
   trackOrders,
   createOrder,
   getOrderStatus,
+  isTrustedCashPayUrl,
   type TrackedOrder,
 } from './cashpay'
 import type { Product } from './useProducts'
@@ -283,7 +284,7 @@ export default function OrderTracking({
       existingBillUrl.toLowerCase().includes('sandbox') ||
       String(order.cashpay_order_ref || '').toLowerCase().includes('sandbox')
 
-    if (existingBillUrl.startsWith('https://') && !isSandbox) {
+    if (isTrustedCashPayUrl(existingBillUrl) && !isSandbox) {
       try {
         localStorage.setItem(
           'pendingPayment',
@@ -330,7 +331,7 @@ export default function OrderTracking({
       })
 
       const newBillUrl = String(cpResp?.bill_url || '').trim()
-      if (newBillUrl.startsWith('https://')) {
+      if (isTrustedCashPayUrl(newBillUrl)) {
         try {
           localStorage.setItem(
             'pendingPayment',
@@ -711,8 +712,14 @@ export default function OrderTracking({
                             const matchedProd = products.find(
                               p => p.name.toLowerCase() === String(item.name || '').toLowerCase()
                             )
+                            const rawItemImg = typeof item.image_url === 'string' ? item.image_url.trim() : ''
+                            const safeItemImg =
+                              rawItemImg.startsWith('https://') ||
+                              (rawItemImg.startsWith('/') && !rawItemImg.startsWith('//'))
+                                ? rawItemImg
+                                : ''
                             const imgUrl =
-                              item.image_url || matchedProd?.images?.[0]?.url || FALLBACK_IMG
+                              safeItemImg || matchedProd?.images?.[0]?.url || FALLBACK_IMG
                             const variants: string[] = []
                             if (item.variant) variants.push(item.variant)
                             if (item.selectedColor) variants.push(item.selectedColor)

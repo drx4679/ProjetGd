@@ -242,6 +242,30 @@ export async function trackOrders(phone: string, orderRef?: string): Promise<Tra
 }
 
 /**
+ * Vérifie qu'une URL de paiement CashPay/Semoa est bien en HTTPS sur un domaine officiel autorisé.
+ */
+export function isTrustedCashPayUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false
+  try {
+    const parsed = new URL(url.trim())
+    if (parsed.protocol !== 'https:') return false
+    const host = parsed.hostname.toLowerCase()
+    return (
+      host === 'semoa-payments.ovh' ||
+      host.endsWith('.semoa-payments.ovh') ||
+      host === 'semoa-payments.com' ||
+      host.endsWith('.semoa-payments.com') ||
+      host === 'cashpay.tg' ||
+      host.endsWith('.cashpay.tg') ||
+      host === 'semoa.com' ||
+      host.endsWith('.semoa.com')
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Génère une référence marchande unique (format GDS-TIMESTAMP-RAND).
  */
 export function generateMerchantRef(): string {
