@@ -41,47 +41,47 @@ const STATUS_CONFIG: Record<
 > = {
   pending: {
     label: 'En attente',
-    badgeClass: 'status-badge-pending',
+    badgeClass: 'badge-pending',
     stepIndex: 0,
-    desc: 'Votre commande a été reçue et est en cours de validation par notre équipe.',
+    desc: 'Votre commande a été reçue et est en cours de validation.',
   },
   confirmed: {
     label: 'Confirmée',
-    badgeClass: 'status-badge-processing',
+    badgeClass: 'badge-processing',
     stepIndex: 1,
     desc: 'Paiement et commande confirmés. Préparation imminente.',
   },
   processing: {
     label: 'En préparation',
-    badgeClass: 'status-badge-processing',
+    badgeClass: 'badge-processing',
     stepIndex: 1,
-    desc: 'Nos préparateurs soignent le conditionnement de vos articles médicaux.',
+    desc: 'Vos articles médicaux sont en cours de conditionnement.',
   },
   shipped: {
     label: 'Expédiée',
-    badgeClass: 'status-badge-shipped',
+    badgeClass: 'badge-shipped',
     stepIndex: 2,
-    desc: 'Votre colis est entre les mains du livreur et en route vers votre adresse.',
+    desc: 'Votre colis est en cours de livraison.',
   },
   delivered: {
     label: 'Livrée',
-    badgeClass: 'status-badge-delivered',
+    badgeClass: 'badge-delivered',
     stepIndex: 3,
-    desc: 'Colis remis en main propre. Merci pour votre confiance !',
+    desc: 'Colis remis en main propre. Merci pour votre confiance.',
   },
   cancelled: {
     label: 'Annulée',
-    badgeClass: 'status-badge-cancelled',
+    badgeClass: 'badge-cancelled',
     stepIndex: -1,
     desc: 'Cette commande a été annulée.',
   },
 }
 
 const TIMELINE_STEPS = [
-  { title: 'Reçue', subtitle: 'Commande enregistrée' },
-  { title: 'Préparation', subtitle: 'Emballage & contrôle' },
-  { title: 'Expédition', subtitle: 'En cours de livraison' },
-  { title: 'Livrée', subtitle: 'Remis au destinataire' },
+  { title: 'Reçue', subtitle: 'Enregistrée' },
+  { title: 'Préparation', subtitle: 'Contrôle' },
+  { title: 'Expédition', subtitle: 'En route' },
+  { title: 'Livrée', subtitle: 'Remis' },
 ]
 
 function normalizePhoneInput(countryCode: string, rawPhone: string): string {
@@ -149,7 +149,7 @@ export default function OrderTracking({
       if (phoneDigits.length < 8 && cleanRef.length < 8) {
         if (!silent) {
           setErrorMsg(
-            'Veuillez saisir votre numéro de téléphone (ex: 90 00 00 00) ou votre référence de commande complète (ex: GDS-...).'
+            'Veuillez saisir votre numéro de téléphone (au moins 8 chiffres) ou votre référence de commande.'
           )
         }
         return
@@ -219,7 +219,6 @@ export default function OrderTracking({
       const initRef = qRef || savedRef
 
       if (initPhone) {
-        // Extraire l'indicatif s'il correspond à notre liste
         const matchedCode = COUNTRY_CODES.find(c => initPhone.startsWith(c.value))
         if (matchedCode) {
           setCountryCode(matchedCode.value)
@@ -287,7 +286,6 @@ export default function OrderTracking({
       existingBillUrl.toLowerCase().includes('sandbox') ||
       String(order.cashpay_order_ref || '').toLowerCase().includes('sandbox')
 
-    // 1. Si un bill_url valide est déjà enregistré, rediriger immédiatement
     if (existingBillUrl.startsWith('https://') && !isSandbox) {
       try {
         localStorage.setItem(
@@ -308,7 +306,6 @@ export default function OrderTracking({
       return
     }
 
-    // 2. Sinon, régénérer un lien de paiement CashPay via le proxy serveur
     try {
       const retryRef = `${orderNumber}-R${Date.now().toString().slice(-4)}`
       const items =
@@ -397,48 +394,82 @@ export default function OrderTracking({
   }
 
   return (
-    <section className="tracking-page">
-      <a
-        className="text-link tracking-back"
-        href="#"
-        onClick={e => {
-          if (onBack) {
-            e.preventDefault()
-            onBack()
-          }
-        }}
-      >
-        ← Retour à la boutique
-      </a>
+    <section className="track-view">
+      <div className="track-container">
+        {/* Navigation retour */}
+        <div className="track-topbar">
+          <button
+            type="button"
+            className="track-back-link"
+            onClick={e => {
+              if (onBack) {
+                e.preventDefault()
+                onBack()
+              }
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span>Retour boutique</span>
+          </button>
 
-      <div className="tracking-intro">
-        <h1>Suivre ma commande</h1>
-        <p>
-          Suivez la préparation et l'acheminement de vos articles médicaux en saisissant votre numéro de téléphone ou votre référence de commande.
-        </p>
-      </div>
+          {hasSearched && lastSyncTime && (
+            <div className="track-sync-indicator">
+              <span className="track-sync-dot" />
+              <span>En direct ({lastSyncTime})</span>
+              <button
+                type="button"
+                className="track-sync-btn"
+                disabled={refreshing || loading}
+                onClick={() => executeSearch(phone, reference, countryCode, true)}
+                title="Actualiser le statut"
+              >
+                <svg
+                  className={refreshing ? 'track-spin' : ''}
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
 
-      {/* ── CARTE DE RECHERCHE INTERACTIVE ── */}
-      <div className="tracking-search-box">
+        {/* En-tête minimaliste */}
+        <div className="track-header">
+          <span className="track-eyebrow">Service Logistique</span>
+          <h1 className="track-title">Suivi de commande</h1>
+          <p className="track-subtitle">
+            Renseignez votre numéro de téléphone ou votre référence pour suivre votre colis.
+          </p>
+        </div>
+
+        {/* Barre de recherche unifiée minimaliste */}
         <form
-          className="tracking-search-form"
+          className="track-form"
           onSubmit={e => {
             e.preventDefault()
             executeSearch(phone, reference, countryCode, false)
           }}
         >
-          <div className="tracking-inputs-grid">
-            {/* Recherche par numéro de téléphone */}
-            <div className="tracking-field">
-              <label htmlFor="tracking-phone-input">
-                Numéro de téléphone
-              </label>
-              <div className="tracking-phone-group">
+          <div className="track-form-grid">
+            {/* Champ Téléphone */}
+            <div className="track-input-wrapper">
+              <span className="track-input-label">Numéro de téléphone</span>
+              <div className="track-phone-row">
                 <select
                   aria-label="Indicatif pays"
                   value={countryCode}
                   onChange={e => setCountryCode(e.target.value)}
-                  className="tracking-country-select"
+                  className="track-select"
                 >
                   {COUNTRY_CODES.map(c => (
                     <option key={c.value} value={c.value}>
@@ -447,7 +478,6 @@ export default function OrderTracking({
                   ))}
                 </select>
                 <input
-                  id="tracking-phone-input"
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
@@ -458,71 +488,60 @@ export default function OrderTracking({
                     setPhone(e.target.value)
                     setErrorMsg(null)
                   }}
+                  className="track-input"
                 />
                 {phone && (
                   <button
                     type="button"
-                    className="tracking-input-clear"
+                    className="track-clear-btn"
                     aria-label="Effacer le numéro"
                     onClick={() => setPhone('')}
                   >
-                    ✕
+                    ×
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Recherche par référence de commande */}
-            <div className="tracking-field">
-              <label htmlFor="tracking-order-input">
-                Référence de commande
-              </label>
-              <div className="tracking-ref-group">
+            {/* Champ Référence */}
+            <div className="track-input-wrapper">
+              <span className="track-input-label">Référence de commande</span>
+              <div className="track-ref-row">
                 <input
-                  id="tracking-order-input"
                   type="text"
                   maxLength={60}
-                  placeholder="Ex : GDS-1793284009576-YBF4Q8"
+                  placeholder="Ex : GDS-1730..."
                   autoComplete="off"
                   value={reference}
                   onChange={e => {
                     setReference(e.target.value)
                     setErrorMsg(null)
                   }}
+                  className="track-input font-mono"
                 />
                 {reference && (
                   <button
                     type="button"
-                    className="tracking-input-clear"
+                    className="track-clear-btn"
                     aria-label="Effacer la référence"
                     onClick={() => setReference('')}
                   >
-                    ✕
+                    ×
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {errorMsg && (
-            <div className="tracking-error-banner" role="alert">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <div className="tracking-search-footer">
-            {(recentPhone || recentRef) && (
-              <div className="tracking-quick-chips">
-                <span className="tracking-quick-label">Récents :</span>
+          {/* Récents & Action */}
+          <div className="track-form-bottom">
+            {(recentPhone || recentRef) ? (
+              <div className="track-recents">
+                <span className="track-recents-title">Récents :</span>
                 {recentPhone && (
                   <button
                     type="button"
-                    className="tracking-chip"
+                    className="track-recent-chip"
                     onClick={() => {
                       const matchedCode = COUNTRY_CODES.find(c => recentPhone.startsWith(c.value))
                       const codeToUse = matchedCode ? matchedCode.value : '+228'
@@ -535,176 +554,147 @@ export default function OrderTracking({
                       executeSearch(localNum, '', codeToUse, false)
                     }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                    </svg>
-                    <span>{recentPhone}</span>
+                    {recentPhone}
                   </button>
                 )}
                 {recentRef && (
                   <button
                     type="button"
-                    className="tracking-chip tracking-chip-mono"
+                    className="track-recent-chip font-mono"
                     onClick={() => {
                       setReference(recentRef)
                       executeSearch(phone, recentRef, countryCode, false)
                     }}
                   >
-                    <span>#{recentRef}</span>
+                    #{recentRef}
                   </button>
                 )}
               </div>
-            )}
+            ) : <div />}
 
-            <button type="submit" className="primary tracking-submit-btn" disabled={loading}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <span>{loading ? 'Recherche en cours…' : 'Suivre ma commande'}</span>
+            <button type="submit" className="track-submit-btn" disabled={loading}>
+              {loading ? (
+                <span>Recherche…</span>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <span>Rechercher</span>
+                </>
+              )}
             </button>
           </div>
+
+          {errorMsg && (
+            <div className="track-alert-banner" role="alert">
+              <span>{errorMsg}</span>
+            </div>
+          )}
         </form>
-      </div>
 
-      {/* ── BARRE DE SYNCHRONISATION EN DIRECT ── */}
-      {hasSearched && lastSyncTime && (
-        <div className="tracking-sync-bar">
-          <div className="tracking-sync-left">
-            <span className="tracking-live-dot">
-              <span className="tracking-live-ping" />
-              <span className="tracking-live-core" />
-            </span>
-            <span>Actualisé à {lastSyncTime}</span>
-          </div>
-          <button
-            type="button"
-            className="tracking-refresh-btn"
-            disabled={refreshing || loading}
-            onClick={() => executeSearch(phone, reference, countryCode, true)}
-          >
-            <svg
-              className={refreshing ? 'spin-icon' : ''}
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.3"
-            >
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-            <span>{refreshing ? 'Actualisation…' : 'Actualiser'}</span>
-          </button>
-        </div>
-      )}
-
-      {/* ── RÉSULTATS DU SUIVI ── */}
-      <div className="tracking-results-container" aria-live="polite">
-        {loading ? (
-          <div className="tracking-state-card">
-            <div className="tracking-spinner" />
-            <h3>Recherche de vos commandes…</h3>
-            <p className="tracking-muted">Veuillez patienter un instant.</p>
-          </div>
-        ) : !hasSearched ? (
-          <div className="tracking-state-card">
-            <div className="tracking-empty-icon" aria-hidden="true">
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-                <path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7 5l10 4" />
-              </svg>
+        {/* ── ZONE DE RÉSULTATS ── */}
+        <div className="track-results-area" aria-live="polite">
+          {loading ? (
+            <div className="track-empty-box">
+              <div className="track-spinner" />
+              <p className="track-empty-text">Recherche de vos commandes en cours…</p>
             </div>
-            <h3>Retrouvez l'état de votre commande</h3>
-            <p className="tracking-muted">
-              Indiquez le numéro de téléphone utilisé lors de votre commande ou votre référence pour suivre votre livraison.
-            </p>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="tracking-state-card">
-            <div className="tracking-empty-icon" aria-hidden="true">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+          ) : !hasSearched ? (
+            <div className="track-empty-box">
+              <div className="track-empty-icon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+              </div>
+              <h3 className="track-empty-heading">Historique &amp; Livraison</h3>
+              <p className="track-empty-sub">
+                Indiquez vos identifiants pour afficher vos colis et l'avancement de la livraison.
+              </p>
             </div>
-            <h3>Aucune commande trouvée</h3>
-            <p className="tracking-muted">
-              Aucune commande ne correspond à votre recherche{' '}
-              <strong>{phone ? normalizePhoneInput(countryCode, phone) : reference}</strong>. Vérifiez le numéro de téléphone renseigné lors de la validation du panier.
-            </p>
-            <a
-              href={`https://wa.me/22892733939?text=${encodeURIComponent(
-                "Bonjour GoodDoctor's Shop, j'ai besoin d'aide pour retrouver le suivi de ma commande."
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tracking-wa-support-btn"
-            >
-              Contacter le support WhatsApp
-            </a>
-          </div>
-        ) : (
-          <div className="tracking-orders-list">
-            {orders.map(order => {
-              const derivedKey = getDerivedStatusKey(order)
-              const st = STATUS_CONFIG[derivedKey] || STATUS_CONFIG.pending
-              const isPaid = String(order.payment_status || '').toLowerCase() === 'paid'
-              const isFailed = String(order.payment_status || '').toLowerCase() === 'failed'
-              const isCancelled = derivedKey === 'cancelled'
-              const needsPayment = !isPaid && !isCancelled && !order.is_delivered
+          ) : orders.length === 0 ? (
+            <div className="track-empty-box">
+              <div className="track-empty-icon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+              </div>
+              <h3 className="track-empty-heading">Aucune commande trouvée</h3>
+              <p className="track-empty-sub">
+                Aucun résultat pour <span className="font-mono text-zinc-800">{phone ? normalizePhoneInput(countryCode, phone) : reference}</span>. Vérifiez les informations saisies lors de la commande.
+              </p>
+              <a
+                href={`https://wa.me/22892733939?text=${encodeURIComponent(
+                  "Bonjour GoodDoctor's Shop, j'ai besoin d'aide pour retrouver le suivi de ma commande."
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="track-link-wa"
+              >
+                Contacter le support WhatsApp
+              </a>
+            </div>
+          ) : (
+            <div className="track-list">
+              {orders.map(order => {
+                const derivedKey = getDerivedStatusKey(order)
+                const st = STATUS_CONFIG[derivedKey] || STATUS_CONFIG.pending
+                const isPaid = String(order.payment_status || '').toLowerCase() === 'paid'
+                const isFailed = String(order.payment_status || '').toLowerCase() === 'failed'
+                const isCancelled = derivedKey === 'cancelled'
+                const needsPayment = !isPaid && !isCancelled && !order.is_delivered
 
-              const dateStr = order.created_at
-                ? new Date(order.created_at).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : 'Date récente'
+                const dateStr = order.created_at
+                  ? new Date(order.created_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'Récemment'
 
-              const currentStep = st.stepIndex
-              const progressPercent =
-                currentStep < 0
-                  ? 100
-                  : Math.min(100, (currentStep / (TIMELINE_STEPS.length - 1)) * 100)
+                const currentStep = st.stepIndex
+                const progressWidth =
+                  currentStep < 0
+                    ? 100
+                    : Math.min(100, (currentStep / (TIMELINE_STEPS.length - 1)) * 100)
 
-              const orderItems = Array.isArray(order.items) ? order.items : []
-              const totalAmount = Number(order.total_amount || order.final_amount || 0)
-              const waMsg = `Bonjour GoodDoctor's Shop, je vous contacte au sujet de ma commande #${order.order_number}. Pouvez-vous me renseigner sur l'état de livraison ?`
-              const waLink = `https://wa.me/22892733939?text=${encodeURIComponent(waMsg)}`
+                const orderItems = Array.isArray(order.items) ? order.items : []
+                const totalAmount = Number(order.total_amount || order.final_amount || 0)
+                const waMsg = `Bonjour GoodDoctor's Shop, je vous contacte au sujet de ma commande #${order.order_number}.`
+                const waLink = `https://wa.me/22892733939?text=${encodeURIComponent(waMsg)}`
 
-              return (
-                <article key={order.order_number || order.id} className="tracked-order-card">
-                  {/* En-tête de la commande */}
-                  <div className="tracked-order-header">
-                    <div className="tracked-order-head-top">
-                      <div>
-                        <div className="tracked-order-ref-row">
-                          <span className="tracked-order-label">COMMANDE</span>
-                          <span className="tracked-order-number">#{order.order_number}</span>
+                return (
+                  <article key={order.order_number || order.id} className="track-card">
+                    {/* Carte En-tête */}
+                    <div className="track-card-head">
+                      <div className="track-card-ref-block">
+                        <div className="track-ref-line">
+                          <span className="track-ref-num font-mono">#{order.order_number}</span>
                           <button
                             type="button"
-                            className="tracked-copy-btn"
+                            className="track-copy-btn"
                             onClick={() => handleCopyRef(order.order_number)}
                             title="Copier la référence"
                           >
-                            {copiedRef === order.order_number ? 'Copié ✓' : 'Copier'}
+                            {copiedRef === order.order_number ? 'Copié' : 'Copier'}
                           </button>
                         </div>
-                        <p className="tracked-order-date">Passée le {dateStr}</p>
+                        <span className="track-date">Passée le {dateStr}</span>
                       </div>
 
-                      <div className="tracked-order-badges">
-                        <span className={`tracked-status-pill ${st.badgeClass}`}>{st.label}</span>
+                      <div className="track-card-badge-row">
+                        <span className={`track-status-badge ${st.badgeClass}`}>{st.label}</span>
                         <button
                           type="button"
-                          className="tracked-delete-btn"
-                          title="Supprimer cette commande"
-                          aria-label={`Supprimer la commande ${order.order_number}`}
+                          className="track-trash-btn"
+                          title="Retirer de l'historique"
+                          aria-label={`Retirer ${order.order_number}`}
                           onClick={() => setConfirmDeleteRef(order.order_number)}
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                           </svg>
@@ -712,46 +702,49 @@ export default function OrderTracking({
                       </div>
                     </div>
 
-                    <p className="tracked-order-desc">{st.desc}</p>
-                  </div>
+                    <p className="track-status-desc">{st.desc}</p>
 
-                  {/* Timeline 4 paliers */}
-                  <div className="tracked-timeline-box">
-                    <div className="tracked-timeline-bar-wrap">
-                      <div className="tracked-timeline-bar-bg" />
+                    {/* Timeline Minimaliste */}
+                    <div className="track-stepper-wrap">
+                      <div className="track-stepper-line-bg" />
                       <div
-                        className={`tracked-timeline-bar-fill ${
-                          isCancelled ? 'cancelled' : derivedKey === 'delivered' ? 'delivered' : ''
+                        className={`track-stepper-line-fill ${
+                          isCancelled ? 'is-cancelled' : derivedKey === 'delivered' ? 'is-delivered' : ''
                         }`}
-                        style={{ width: `calc(${progressPercent}% * 0.88)` }}
+                        style={{ width: `${progressWidth}%` }}
                       />
-                      <div className="tracked-timeline-steps">
+                      <div className="track-stepper-nodes">
                         {TIMELINE_STEPS.map((stepItem, idx) => {
                           const isPast = currentStep >= idx
                           const isCurrent = currentStep === idx
                           return (
                             <div
                               key={stepItem.title}
-                              className={`tracked-step-node ${isPast ? 'past' : ''} ${
-                                isCurrent ? 'current' : ''
-                              } ${isCancelled ? 'cancelled' : ''}`}
+                              className={`track-node ${isPast ? 'is-past' : ''} ${
+                                isCurrent ? 'is-current' : ''
+                              } ${isCancelled ? 'is-cancelled' : ''}`}
                             >
-                              <div className="tracked-step-circle">{idx + 1}</div>
-                              <span className="tracked-step-title">{stepItem.title}</span>
-                              <span className="tracked-step-sub">{stepItem.subtitle}</span>
+                              <div className="track-node-circle">
+                                {isPast && !isCurrent ? (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                ) : (
+                                  idx + 1
+                                )}
+                              </div>
+                              <span className="track-node-label">{stepItem.title}</span>
                             </div>
                           )
                         })}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Corps de la commande : articles + livraison + paiement */}
-                  <div className="tracked-order-body">
+                    {/* Liste des articles */}
                     {orderItems.length > 0 && (
-                      <div className="tracked-items-section">
-                        <h4>Articles commandés ({orderItems.reduce((s, i) => s + (Number(i.quantity) || 1), 0)})</h4>
-                        <div className="tracked-items-list">
+                      <div className="track-items-block">
+                        <span className="track-section-label">Articles ({orderItems.length})</span>
+                        <div className="track-items-rows">
                           {orderItems.map((item, idx) => {
                             const matchedProd = products.find(
                               p => p.name.toLowerCase() === String(item.name || '').toLowerCase()
@@ -764,26 +757,22 @@ export default function OrderTracking({
                             if (item.selectedSize) variants.push(`Taille ${item.selectedSize}`)
 
                             return (
-                              <div key={`${item.name}-${idx}`} className="tracked-item-row">
+                              <div key={`${item.name}-${idx}`} className="track-item-row">
                                 <img
                                   src={imgUrl}
                                   alt={item.name}
-                                  className="tracked-item-thumb"
+                                  className="track-item-img"
                                   loading="lazy"
                                 />
-                                <div className="tracked-item-info">
-                                  <b>{item.name}</b>
+                                <div className="track-item-info">
+                                  <span className="track-item-name">{item.name}</span>
                                   {variants.length > 0 && (
-                                    <div className="tracked-item-variants">
-                                      {variants.map(v => (
-                                        <span key={v}>{v}</span>
-                                      ))}
-                                    </div>
+                                    <span className="track-item-meta">{variants.join(' · ')}</span>
                                   )}
                                 </div>
-                                <div className="tracked-item-price">
-                                  <b>{formatMoney(Number(item.price || 0))}</b>
-                                  <span>Qté : {item.quantity || 1}</span>
+                                <div className="track-item-price-block">
+                                  <span className="track-item-price">{formatMoney(Number(item.price || 0))}</span>
+                                  <span className="track-item-qty">Qté : {item.quantity || 1}</span>
                                 </div>
                               </div>
                             )
@@ -792,144 +781,129 @@ export default function OrderTracking({
                       </div>
                     )}
 
-                    {/* Grille Lieu de livraison & Règlement */}
-                    <div className="tracked-meta-grid">
-                      <div className="tracked-meta-card">
-                        <span className="tracked-meta-label">Client &amp; Lieu de livraison</span>
-                        <b>{order.customer_name || 'Client'}</b>
-                        <p>
-                          {order.customer_address ||
-                            order.delivery_address ||
-                            `${order.delivery_city || 'Lomé'}, ${order.delivery_country || 'Togo'}`}
-                        </p>
-                        {order.customer_phone && <small>{order.customer_phone}</small>}
+                    {/* Métadonnées minimalistes (Destinataire + Montant) */}
+                    <div className="track-meta-row">
+                      <div className="track-meta-col">
+                        <span className="track-section-label">Destinataire &amp; Livraison</span>
+                        <span className="track-meta-val font-semibold">{order.customer_name || 'Client'}</span>
+                        <span className="track-meta-sub">
+                          {order.customer_address || order.delivery_address || 'Lomé, Togo'}
+                        </span>
+                        {order.customer_phone && (
+                          <span className="track-meta-sub font-mono">{order.customer_phone}</span>
+                        )}
                       </div>
 
-                      <div className="tracked-meta-card tracked-meta-payment">
-                        <div>
-                          <span className="tracked-meta-label">Règlement</span>
-                          <span
-                            className={`tracked-pay-badge ${
-                              isPaid ? 'paid' : isFailed ? 'failed' : 'pending'
-                            }`}
-                          >
-                            {isPaid
-                              ? 'Payé en ligne ✓'
-                              : isFailed
-                              ? 'Paiement échoué'
-                              : 'Paiement en attente'}
-                          </span>
-                        </div>
-                        <div className="tracked-total-col">
-                          <span className="tracked-meta-label">Total</span>
-                          <b className="tracked-total-amount">{formatMoney(totalAmount)}</b>
-                        </div>
+                      <div className="track-meta-col text-right">
+                        <span className="track-section-label">Règlement</span>
+                        <span className={`track-pay-status ${isPaid ? 'is-paid' : isFailed ? 'is-failed' : 'is-pending'}`}>
+                          {isPaid ? 'Payé ✓' : isFailed ? 'Échec' : 'En attente'}
+                        </span>
+                        <span className="track-total-val">{formatMoney(totalAmount)}</span>
                       </div>
                     </div>
 
-                    {/* Bandeau d'alerte si paiement en attente */}
+                    {/* Action Paiement si en attente */}
                     {needsPayment && (
-                      <div className="tracked-payment-alert">
-                        <div>
-                          <h5>Paiement en attente de validation</h5>
-                          <p>
-                            Votre commande est enregistrée. Pour déclencher immédiatement la préparation et l'expédition, validez votre règlement en ligne via <strong>CashPay</strong> (Moov Money, Mixx, Coris Money ou Carte bancaire Visa / Mastercard).
-                          </p>
+                      <div className="track-pay-prompt">
+                        <div className="track-pay-text">
+                          <strong>Paiement en attente</strong>
+                          <span>Réglez directement en ligne pour déclencher la livraison.</span>
                         </div>
                         <button
                           type="button"
-                          className="tracked-pay-now-btn"
+                          className="track-pay-cta"
                           disabled={payingOrderRef === order.order_number}
                           onClick={() => handlePayOnCashPay(order)}
                         >
                           {payingOrderRef === order.order_number
-                            ? 'Redirection CashPay…'
-                            : `Payer sur CashPay (${formatMoney(totalAmount)})`}
+                            ? 'Redirection…'
+                            : `Régler ${formatMoney(totalAmount)}`}
                         </button>
                       </div>
                     )}
 
-                    {/* Actions bas de carte */}
-                    <div className="tracked-actions-bar">
-                      <div className="tracked-actions-left">
-                        <a
-                          href={waLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="tracked-wa-btn"
-                        >
-                          Assistance WhatsApp
-                        </a>
-                      </div>
+                    {/* Pied de carte : Liens discrets */}
+                    <div className="track-card-footer">
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="track-footer-link"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        </svg>
+                        <span>Assistance WhatsApp</span>
+                      </a>
 
                       <button
                         type="button"
-                        className="tracked-verify-btn"
+                        className="track-footer-btn"
                         disabled={verifyingOrderRef === order.order_number}
                         onClick={() => handleVerifyOrderPayment(order)}
                       >
-                        {verifyingOrderRef === order.order_number
-                          ? 'Vérification…'
-                          : "Vérifier l'état"}
+                        {verifyingOrderRef === order.order_number ? 'Actualisation…' : 'Vérifier le statut'}
                       </button>
                     </div>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
-      {/* Modale de confirmation de suppression */}
-      {confirmDeleteRef && (
-        <div
-          className="tracking-delete-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !deletingRef && setConfirmDeleteRef(null)}
-        >
-          <div className="tracking-delete-modal" onClick={e => e.stopPropagation()}>
-            <h3>Supprimer la commande #{confirmDeleteRef} ?</h3>
-            <p>
-              Cette action retirera définitivement cette commande de votre historique de suivi.
-            </p>
-            <div className="tracking-delete-modal-actions">
-              <button
-                type="button"
-                className="tracking-cancel-btn"
-                disabled={Boolean(deletingRef)}
-                onClick={() => setConfirmDeleteRef(null)}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                className="tracking-confirm-delete-btn"
-                disabled={Boolean(deletingRef)}
-                onClick={() => handleDeleteOrder(confirmDeleteRef)}
-              >
-                {deletingRef ? 'Suppression…' : 'Supprimer'}
-              </button>
+        {/* Modale de confirmation de suppression minimaliste */}
+        {confirmDeleteRef && (
+          <div
+            className="track-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !deletingRef && setConfirmDeleteRef(null)}
+          >
+            <div className="track-modal-content" onClick={e => e.stopPropagation()}>
+              <h3 className="track-modal-title">Retirer cette commande ?</h3>
+              <p className="track-modal-p">
+                La commande <span className="font-mono font-semibold">#{confirmDeleteRef}</span> ne sera plus mémorisée dans votre historique de recherche local.
+              </p>
+              <div className="track-modal-actions">
+                <button
+                  type="button"
+                  className="track-modal-cancel"
+                  disabled={Boolean(deletingRef)}
+                  onClick={() => setConfirmDeleteRef(null)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="track-modal-confirm"
+                  disabled={Boolean(deletingRef)}
+                  onClick={() => handleDeleteOrder(confirmDeleteRef)}
+                >
+                  {deletingRef ? 'Suppression…' : 'Confirmer'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="tracking-help">
-        <h2>Questions fréquentes sur le suivi</h2>
-        <details>
-          <summary>Comment retrouver ma commande sans son numéro de référence ?</summary>
-          <p>
-            Saisissez simplement le numéro de téléphone utilisé lors de votre commande (ex : 90 00 00 00). Toutes les commandes associées à votre numéro s'afficheront automatiquement.
-          </p>
-        </details>
-        <details>
-          <summary>J'ai payé sur CashPay mais le statut indique encore « Paiement en attente »</summary>
-          <p>
-            Cliquez sur le bouton « Vérifier l'état » sur la carte de votre commande : notre serveur interroge directement CashPay en temps réel et met à jour votre commande instantanément.
-          </p>
-        </details>
+        {/* Section FAQ discrète */}
+        <div className="track-faq">
+          <span className="track-faq-eyebrow">Aide &amp; Renseignements</span>
+          <details className="track-faq-item">
+            <summary>Comment suivre une commande sans le numéro de référence ?</summary>
+            <p>
+              Entrez simplement le numéro de téléphone utilisé lors de votre achat. L'ensemble des commandes associées à ce numéro s'affichera automatiquement.
+            </p>
+          </details>
+          <details className="track-faq-item">
+            <summary>Mon paiement a été effectué mais le statut n'a pas changé</summary>
+            <p>
+              Cliquez sur « Vérifier le statut » sur votre commande pour actualiser instantanément l'état auprès du serveur de paiement.
+            </p>
+          </details>
+        </div>
       </div>
     </section>
   )
