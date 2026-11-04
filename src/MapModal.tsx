@@ -51,9 +51,8 @@ function loadLeaflet(): Promise<void> {
     if (!document.querySelector('link[href*="leaflet.css"]')) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
+      // Fichier same-origin : pas de SRI (le CDN peut réécrire/minifier le CSS et casser l'empreinte)
       link.href = '/vendor/leaflet/leaflet.css'
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
-      link.crossOrigin = 'anonymous'
       document.head.appendChild(link)
     }
     const existingScript = document.querySelector('script[src*="leaflet.js"]') as HTMLScriptElement | null
@@ -72,8 +71,6 @@ function loadLeaflet(): Promise<void> {
     const script = document.createElement('script')
     // Leaflet 1.9.4 auto-hébergé (/public/vendor/leaflet) : plus de dépendance à un CDN tiers
     script.src = '/vendor/leaflet/leaflet.js'
-    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
-    script.crossOrigin = 'anonymous'
     script.onload = () => resolve()
     script.onerror = () => {
       script.remove()
