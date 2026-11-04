@@ -242,32 +242,6 @@ export async function trackOrders(phone: string, orderRef?: string): Promise<Tra
 }
 
 /**
- * Supprime une commande depuis le suivi client.
- */
-export async function deleteTrackedOrder(orderNumber: string, phone?: string): Promise<void> {
-  const timeout = createTimeout(12000)
-  try {
-    const response = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'delete_order',
-        orderNumber: orderNumber.trim(),
-        phone: (phone || '').trim(),
-      }),
-      signal: timeout.signal,
-    })
-
-    if (!response.ok) {
-      const errMsg = await parseErrorMessage(response)
-      throw new Error(errMsg)
-    }
-  } finally {
-    timeout.clear()
-  }
-}
-
-/**
  * Génère une référence marchande unique (format GDS-TIMESTAMP-RAND).
  */
 export function generateMerchantRef(): string {

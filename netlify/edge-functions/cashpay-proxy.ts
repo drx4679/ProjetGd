@@ -919,107 +919,6 @@ export default async (req: Request, context: Context) => {
       return await buildJweResponse({ orders }, 200, secHeaders, req.headers.get("x-pub-key"))
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // ACTION 4 : SUPPRIMER UNE COMMANDE DEPUIS LE SUIVI CLIENT
-    // ══════════════════════════════════════════════════════════════
-    if (action === "delete_order") {
-      if (!supabaseUrl || !supabaseKey) {
-        return new Response(JSON.stringify({ error: "Configuration serveur manquante" }), {
-          status: 500,
-          headers: secHeaders,
-        })
-      }
-
-      const orderNumber = String(body?.orderNumber || "").trim()
-      const phone = String(body?.phone || "").trim()
-
-      if (!orderNumber || !/^[\w-]+$/.test(orderNumber)) {
-        return new Response(JSON.stringify({ error: "Référence de commande invalide" }), {
-          status: 400,
-          headers: secHeaders,
-        })
-      }
-
-      const encRef = encodeURIComponent(orderNumber)
-      const lookupResp = await fetch(
-        `${supabaseUrl}/rest/v1/orders?or=(order_number.eq.${encRef},merchant_reference.eq.${encRef})&select=id,order_number,customer_phone,payment_status,status,is_shipped,is_delivered&limit=1`,
-        {
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          signal: AbortSignal.timeout(6000),
-        }
-      )
-
-      if (!lookupResp.ok) {
-        return new Response(JSON.stringify({ error: "Erreur lors de la vérification de la commande" }), {
-          status: 500,
-          headers: secHeaders,
-        })
-      }
-
-      const rows = await lookupResp.json()
-      const order = Array.isArray(rows) ? rows[0] : null
-      if (!order) {
-        return new Response(JSON.stringify({ error: "Commande introuvable" }), {
-          status: 404,
-          headers: secHeaders,
-        })
-      }
-
-      // Interdire la suppression d'une commande déjà payée, expédiée ou livrée
-      const pStatus = String(order.payment_status || "").toLowerCase()
-      const oStatus = String(order.status || "").toLowerCase()
-      if (
-        order.is_shipped ||
-        order.is_delivered ||
-        pStatus === "paid" ||
-        ["paid", "shipped", "delivered", "completed"].includes(oStatus)
-      ) {
-        return new Response(
-          JSON.stringify({ error: "Impossible de supprimer une commande déjà payée, expédiée ou livrée." }),
-          { status: 403, headers: secHeaders }
-        )
-      }
-
-      // Vérification obligatoire des 8 derniers chiffres du numéro de téléphone associé à la commande
-      const inputDigits = phone.replace(/\D/g, "")
-      const orderDigits = String(order.customer_phone || "").replace(/\D/g, "")
-      if (orderDigits.length >= 8) {
-        if (inputDigits.length < 8 || inputDigits.slice(-8) !== orderDigits.slice(-8)) {
-          return new Response(
-            JSON.stringify({ error: "Non autorisé : veuillez renseigner le numéro de téléphone associé à cette commande." }),
-            { status: 403, headers: secHeaders }
-          )
-        }
-      }
-
-      const delResp = await fetch(
-        `${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(order.id)}`,
-        {
-          method: "DELETE",
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          signal: AbortSignal.timeout(6000),
-        }
-      )
-
-      if (!delResp.ok) {
-        return new Response(JSON.stringify({ error: "Impossible de supprimer la commande" }), {
-          status: 500,
-          headers: secHeaders,
-        })
-      }
-
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: secHeaders,
-      })
-    }
-
     return new Response(JSON.stringify({ error: "Action inconnue" }), {
       status: 400,
       headers: secHeaders,
@@ -1028,7 +927,7 @@ export default async (req: Request, context: Context) => {
     console.error("[CashPay Proxy] Erreur:", err?.message || err)
     return new Response(
       JSON.stringify({
-        error: err?.message || "Erreur interne du serveur de paiement",
+        error: "Erreur interne du serveur de paiement",
       }),
       { status: 500, headers: secHeaders }
     )
