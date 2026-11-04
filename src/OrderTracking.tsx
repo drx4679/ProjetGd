@@ -3,7 +3,6 @@ import { formatMoney } from './money'
 import { sanitizeUserErrorMessage } from './errorSanitizer'
 import {
   trackOrders,
-  deleteTrackedOrder,
   createOrder,
   getOrderStatus,
   type TrackedOrder,
@@ -128,8 +127,6 @@ export default function OrderTracking({
   const [copiedRef, setCopiedRef] = useState<string | null>(null)
   const [payingOrderRef, setPayingOrderRef] = useState<string | null>(null)
   const [verifyingOrderRef, setVerifyingOrderRef] = useState<string | null>(null)
-  const [confirmDeleteRef, setConfirmDeleteRef] = useState<string | null>(null)
-  const [deletingRef, setDeletingRef] = useState<string | null>(null)
 
   // Raccourcis récents sauvegardés
   const [recentPhone, setRecentPhone] = useState<string>('')
@@ -361,35 +358,6 @@ export default function OrderTracking({
           "Impossible d'ouvrir le portail CashPay pour le moment. Vous pouvez finaliser via l'assistance WhatsApp."
         )
       )
-    }
-  }
-
-  // Supprimer une commande
-  const handleDeleteOrder = async (orderNumber: string) => {
-    setDeletingRef(orderNumber)
-    try {
-      const targetOrder = orders.find(o => o.order_number === orderNumber)
-      const verifyPhone =
-        targetOrder?.customer_phone || normalizePhoneInput(countryCode, phone) || recentPhone
-      await deleteTrackedOrder(orderNumber, verifyPhone)
-      setOrders(prev => prev.filter(o => o.order_number !== orderNumber))
-      setConfirmDeleteRef(null)
-      if (recentRef === orderNumber) {
-        try {
-          localStorage.removeItem('gds_tracking_last_ref')
-          setRecentRef('')
-        } catch {}
-      }
-    } catch (err: any) {
-      setErrorMsg(
-        sanitizeUserErrorMessage(
-          err,
-          'Impossible de supprimer cette commande pour le moment. Veuillez réessayer.'
-        )
-      )
-      setConfirmDeleteRef(null)
-    } finally {
-      setDeletingRef(null)
     }
   }
 
@@ -687,18 +655,6 @@ export default function OrderTracking({
 
                       <div className="track-card-badge-row">
                         <span className={`track-status-badge ${st.badgeClass}`}>{st.label}</span>
-                        <button
-                          type="button"
-                          className="track-trash-btn"
-                          title="Retirer de l'historique"
-                          aria-label={`Retirer ${order.order_number}`}
-                          onClick={() => setConfirmDeleteRef(order.order_number)}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
                       </div>
                     </div>
 
@@ -852,41 +808,6 @@ export default function OrderTracking({
             </div>
           )}
         </div>
-
-        {/* Modale de confirmation de suppression minimaliste */}
-        {confirmDeleteRef && (
-          <div
-            className="track-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => !deletingRef && setConfirmDeleteRef(null)}
-          >
-            <div className="track-modal-content" onClick={e => e.stopPropagation()}>
-              <h3 className="track-modal-title">Retirer cette commande ?</h3>
-              <p className="track-modal-p">
-                La commande <span className="font-mono font-semibold">#{confirmDeleteRef}</span> ne sera plus mémorisée dans votre historique de recherche local.
-              </p>
-              <div className="track-modal-actions">
-                <button
-                  type="button"
-                  className="track-modal-cancel"
-                  disabled={Boolean(deletingRef)}
-                  onClick={() => setConfirmDeleteRef(null)}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  className="track-modal-confirm"
-                  disabled={Boolean(deletingRef)}
-                  onClick={() => handleDeleteOrder(confirmDeleteRef)}
-                >
-                  {deletingRef ? 'Suppression…' : 'Confirmer'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Section FAQ discrète */}
         <div className="track-faq">
