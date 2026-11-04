@@ -58,7 +58,15 @@ function loadLeaflet(): Promise<void> {
     }
     const existingScript = document.querySelector('script[src*="leaflet.js"]') as HTMLScriptElement | null
     if (existingScript) {
+      if ((window as any).L) {
+        resolve()
+        return
+      }
       existingScript.addEventListener('load', () => resolve(), { once: true })
+      existingScript.addEventListener('error', () => {
+        existingScript.remove()
+        resolve()
+      }, { once: true })
       return
     }
     const script = document.createElement('script')
@@ -66,6 +74,10 @@ function loadLeaflet(): Promise<void> {
     script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
     script.crossOrigin = 'anonymous'
     script.onload = () => resolve()
+    script.onerror = () => {
+      script.remove()
+      resolve()
+    }
     document.head.appendChild(script)
   })
 }
@@ -247,9 +259,18 @@ export default function MapModal({
     }
 
     const timer = setTimeout(init, 100)
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onEsc, true)
     return () => {
       cancelled = true
       clearTimeout(timer)
+      document.removeEventListener('keydown', onEsc, true)
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null

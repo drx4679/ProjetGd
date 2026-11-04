@@ -14,6 +14,8 @@ export default function ModalShell({ label, onClose, children }: { label: string
     document.body.style.overflow = 'hidden'
     dialog.current?.focus()
     const onKey = (event: KeyboardEvent) => {
+      // Si une sous-modale (ex: #map-modal) est ouverte au-dessus, lui laisser la gestion du clavier
+      if (document.getElementById('map-modal')) return
       if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
       if (event.key !== 'Tab') return
       const nodes = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), summary, iframe, [tabindex="0"]') ?? [])
@@ -28,7 +30,10 @@ export default function ModalShell({ label, onClose, children }: { label: string
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow
-      if (root) root.inert = previousInert
+      if (root) {
+        const remainingOverlays = document.querySelectorAll('.overlay')
+        root.inert = remainingOverlays.length > 1 ? previousInert : false
+      }
       previous?.focus()
     }
   }, [])
