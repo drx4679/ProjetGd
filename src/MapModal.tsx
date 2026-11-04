@@ -423,6 +423,9 @@ export default function MapModal({
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
                 <input
+                  id="map-search-input"
+                  name="map_search"
+                  aria-label="Rechercher un quartier sur la carte"
                   type="text"
                   placeholder="Rechercher un quartier..."
                   autoComplete="off"

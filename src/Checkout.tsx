@@ -484,8 +484,10 @@ export default function Checkout({
                         <p>Votre adresse se situe à plus de 20 km du siège ({deliveryDistanceKm?.toFixed(1)} km). Les frais de livraison seront définis une fois le colis déposé en gare pour expédition.</p>
                       </div>
                     </div>
-                    <label className="ecom-outofzone-label">
+                    <label htmlFor="accept-out-of-zone" className="ecom-outofzone-label">
                       <input
+                        id="accept-out-of-zone"
+                        name="accept_out_of_zone"
                         type="checkbox"
                         checked={acceptOutOfZone}
                         onChange={e => {
@@ -562,6 +564,7 @@ export default function Checkout({
               <input
                 type="checkbox"
                 id="agree-legal"
+                name="agree_legal"
                 checked={agreeLegal}
                 onChange={e => {
                   setAgreeLegal(e.target.checked)

@@ -431,9 +431,11 @@ export default function OrderTracking({
           <div className="track-form-grid">
             {/* Champ Téléphone */}
             <div className="track-input-wrapper">
-              <span className="track-input-label">Numéro de téléphone</span>
+              <label htmlFor="track-phone-input" className="track-input-label">Numéro de téléphone</label>
               <div className="track-phone-row">
                 <select
+                  id="track-country-code"
+                  name="track_country_code"
                   aria-label="Indicatif pays"
                   value={countryCode}
                   onChange={e => setCountryCode(e.target.value)}
@@ -446,6 +448,8 @@ export default function OrderTracking({
                   ))}
                 </select>
                 <input
+                  id="track-phone-input"
+                  name="track_phone"
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
@@ -473,9 +477,11 @@ export default function OrderTracking({
 
             {/* Champ Référence */}
             <div className="track-input-wrapper">
-              <span className="track-input-label">Référence de commande</span>
+              <label htmlFor="track-ref-input" className="track-input-label">Référence de commande</label>
               <div className="track-ref-row">
                 <input
+                  id="track-ref-input"
+                  name="track_reference"
                   type="text"
                   maxLength={60}
                   placeholder="Ex : GDS-1730..."

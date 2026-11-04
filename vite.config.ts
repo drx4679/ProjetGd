@@ -122,12 +122,12 @@ function gdSecurityPlugin(): Plugin {
   const SUPABASE = 'https://jhybjpetiotzbtkfbxkr.supabase.co'
   const csp = [
     "default-src 'self'",
-    "script-src 'self' https://unpkg.com",
+    "script-src 'self' 'unsafe-inline' https://unpkg.com https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
     "font-src 'self' https://fonts.gstatic.com",
     `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://unpkg.com https://wsrv.nl`,
-    `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org`,
-    "frame-src 'none'",
+    `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org https://cloudflareinsights.com https://*.cloudflareinsights.com`,
+    "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -157,17 +157,6 @@ function gdSecurityPlugin(): Plugin {
     },
     configurePreviewServer(server) {
       server.middlewares.use(apply(strictHeaders))
-    },
-    transformIndexHtml(_html, ctx) {
-      // ctx.bundle n'existe qu'au build : pas de CSP stricte en dev.
-      if (!ctx.bundle) return
-      return [
-        {
-          tag: 'meta',
-          attrs: { 'http-equiv': 'Content-Security-Policy', content: csp },
-          injectTo: 'head-prepend',
-        },
-      ]
     },
   }
 }
