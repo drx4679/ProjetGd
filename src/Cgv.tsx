@@ -126,7 +126,7 @@ export default function Cgv({ onBack }: CgvProps) {
           </h2>
           <p>GoodDoctor's Shop dessert le Grand Lomé, les villes de l'intérieur du Togo ainsi que la sous-région :</p>
           <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
-            <li><strong>Zone directe - Grand Lomé (≤ 20 km) :</strong> Les frais de livraison sont calculés selon la distance routière (de 1 000 à 2 000 FCFA). <strong>La livraison est offerte pour toute commande atteignant ou dépassant 35 000 FCFA.</strong> Le délai habituel de livraison est de <strong>24 à 48 heures ouvrées</strong>.</li>
+            <li><strong>Zone directe - Grand Lomé (≤ 20 km) :</strong> Les frais de livraison sont calculés selon la distance routière (de 1 000 à 2 000 FCFA). Le délai habituel de livraison est de <strong>24 à 48 heures ouvrées</strong>.</li>
             <li><strong>Hors zone directe Lomé (&gt; 20 km) &amp; Intérieur du Togo :</strong> La livraison s'opère par dépôt en gare ou compagnie de transport routier. Les frais d'expédition sont définis au cas par cas lors du dépôt en accord avec le client.</li>
             <li><strong>Commandes internationales :</strong> Pour les pays frontaliers (Bénin, Ghana, etc.) et la diaspora, les conditions et coûts d'acheminement sont établis sur mesure par notre service logistique.</li>
           </ul>

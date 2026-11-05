@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import MapModal from './MapModal'
-import { formatMoney as money, freeDeliveryThreshold } from './money'
+import { formatMoney as money } from './money'
 import { createOrder, getOrderStatus, generateMerchantRef, isTrustedCashPayUrl, type CashPayOrderItem } from './cashpay'
 import { sanitizeUserErrorMessage } from './errorSanitizer'
 
@@ -104,9 +104,6 @@ export default function Checkout({
   } else if (!isTogoOrder) {
     deliveryFee = 0
     deliveryLabel = "Défini à l'expédition"
-  } else if (subtotal >= freeDeliveryThreshold) {
-    deliveryFee = 0
-    deliveryLabel = 'Offerte'
   } else if (deliveryDistanceKm !== null) {
     if (deliveryDistanceKm <= 10) {
       deliveryFee = 1000
