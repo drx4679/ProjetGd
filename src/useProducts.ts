@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import defaultSnapshot from './products-snapshot.json'
-import { getJweRequestHeaders, parseAndDecryptJwe } from './jweClient'
 
 export type Product = {
   id: string
@@ -190,12 +188,13 @@ function transformPublicProduct(item: any): Product {
 
 const CACHE_KEY = 'gds_products_cache_v2'
 
-function getInitialCache(): { products: Product[]; categories: string[] } | null {
+function getInitialCache(): { products: Product[]; categories: string[]; ageMs: number } | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { data, ts } = JSON.parse(raw)
-    if (Array.isArray(data) && data.length > 0 && Date.now() - ts < 30 * 60 * 1000) {
+    const ageMs = Date.now() - Number(ts || 0)
+    if (Array.isArray(data) && data.length > 0 && ageMs < 60 * 60 * 1000) {
       const sanitized: Product[] = data
         .filter((p: any) => p && typeof p.id === 'string' && typeof p.name === 'string' && Number.isFinite(Number(p.price)) && Number(p.price) >= 0)
         .map((p: any) => ({
@@ -214,64 +213,65 @@ function getInitialCache(): { products: Product[]; categories: string[] } | null
       return {
         products: sanitized,
         categories: ['Tout', ...(Array.from(cats).sort() as string[])],
+        ageMs,
       }
     }
   } catch { /* ignore */ }
   return null
 }
 
-function getBundledSnapshotProducts(): Product[] {
+function parseSnapshotProducts(snap: any): Product[] {
   try {
-    const snap = defaultSnapshot as any
-    const c2 = (snap.catalog2 || []).map(transformCatalog2Product)
-    const pb = (snap.public || snap.publicProducts || []).map(transformPublicProduct)
+    const c2 = (snap?.catalog2 || []).map(transformCatalog2Product)
+    const pb = (snap?.public || snap?.publicProducts || []).map(transformPublicProduct)
     return [...pb, ...c2]
   } catch {
     return []
   }
 }
 
-const BUNDLED_PRODUCTS: Product[] = getBundledSnapshotProducts()
-
-function getInitialProducts(): { products: Product[]; categories: string[] } {
-  const cached = getInitialCache()
-  if (cached && cached.products.length > 0) return cached
-  const cats = new Set(BUNDLED_PRODUCTS.map(p => p.category))
-  return {
-    products: BUNDLED_PRODUCTS,
-    categories: ['Tout', ...(Array.from(cats).sort() as string[])],
-  }
-}
-
 export function useProducts() {
-  const initial = getInitialProducts()
-  const [products, setProducts] = useState<Product[]>(() => initial.products)
-  const [categories, setCategories] = useState<string[]>(() => initial.categories)
-  const [loading, setLoading] = useState<boolean>(() => initial.products.length === 0)
+  const [initialCache] = useState(() => getInitialCache())
+  const [products, setProducts] = useState<Product[]>(() => initialCache?.products || [])
+  const [categories, setCategories] = useState<string[]>(() => initialCache?.categories || ['Tout'])
+  const [loading, setLoading] = useState<boolean>(() => !initialCache || initialCache.products.length === 0)
 
   useEffect(() => {
     let cancelled = false
+    let hasLiveProducts = false
 
-    const applyProducts = (merged: Product[]) => {
+    const applyProducts = (merged: Product[], persist = true) => {
       if (cancelled || merged.length === 0) return
       const cats = new Set(merged.map(p => p.category))
       setProducts(merged)
       setCategories(['Tout', ...(Array.from(cats).sort() as string[])])
       setLoading(false)
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: merged, ts: Date.now() }))
-      } catch { /* storage full */ }
+      if (persist) {
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ data: merged, ts: Date.now() }))
+        } catch { /* storage full */ }
+      }
     }
 
-    async function load() {
-      // Rafraîchissement en arrière-plan.
-      // Le navigateur ne parle JAMAIS à Supabase : il appelle uniquement /api/products
-      // (Netlify Edge Function en production, même fonction servie par Vite en dev local).
-      // La clé SUPABASE_SERVICE_ROLE_KEY reste côté serveur.
+    // Si aucun cache localStorage n'est présent (1re visite), charge le chunk snapshot en ~15ms sans gonfler le bundle principal
+    if (!initialCache || initialCache.products.length === 0) {
+      import('./products-snapshot.json')
+        .then((mod) => {
+          if (cancelled || hasLiveProducts) return
+          const snapProducts = parseSnapshotProducts(mod.default || mod)
+          if (snapProducts.length > 0) {
+            applyProducts(snapProducts, false)
+          }
+        })
+        .catch(() => {})
+    }
+
+    async function loadFromApi() {
       try {
         let catalog2: any[] = []
         let publicData: any[] = []
 
+        const { getJweRequestHeaders, parseAndDecryptJwe } = await import('./jweClient')
         const headers = await getJweRequestHeaders({ Accept: 'application/json' })
         const res = await fetch('/api/products', { headers })
         if (res.ok) {
@@ -286,7 +286,8 @@ export function useProducts() {
           ...catalog2.map(transformCatalog2Product),
         ]
         if (merged.length > 0) {
-          applyProducts(merged)
+          hasLiveProducts = true
+          applyProducts(merged, true)
         }
       } catch (err) {
         console.error('[Products] Erreur réseau:', err)
@@ -295,9 +296,15 @@ export function useProducts() {
       }
     }
 
-    load()
-    return () => { cancelled = true }
-  }, [])
+    // Si le cache local est très récent (< 5 min), diffère le rafraîchissement JWE/RSA-2048 pour laisser la priorité totale au rendu et aux images
+    const delayMs = initialCache && initialCache.ageMs < 5 * 60 * 1000 ? 2500 : 0
+    const timer = window.setTimeout(loadFromApi, delayMs)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [initialCache])
 
   return { products, categories, loading }
 }

@@ -48,29 +48,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Ne pas intercepter les appels API dynamiques hors /api/products (ex: /api/cashpay-proxy, /api/newsletter)
-  if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/products')) {
-    return;
-  }
-
-  // 1. API Produits : Network-First avec repli sur le cache uniquement si hors-ligne
-  if (url.pathname.startsWith('/api/products')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          return cached || Response.error();
-        })
-    );
+  // Ne pas intercepter les appels API dynamiques (/api/products a déjà son cache localStorage déchiffré)
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 

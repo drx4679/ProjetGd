@@ -2716,5 +2716,14 @@ a {
   }
 }
 
+/* ── OPTIMISATION RENDU & LAYOUT BELOW-THE-FOLD (Content-Visibility) ── */
+.order-steps,
+.newsletter,
+.site-footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+
 
 

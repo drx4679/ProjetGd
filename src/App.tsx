@@ -43,6 +43,11 @@ function getProductObjectPosition(name: string): string | undefined {
 
 function checkImgBrightness(imgEl: HTMLImageElement, setLight: (v: boolean) => void) {
   try {
+    // Évite la relecture canvas sur les images externes (déjà en cache mémoire sans CORS)
+    if (imgEl.src && !imgEl.src.startsWith(window.location.origin) && !imgEl.src.startsWith('data:')) {
+      setLight(true)
+      return
+    }
     const canvas = document.createElement('canvas')
     canvas.width = 16
     canvas.height = 16
@@ -69,30 +74,35 @@ function ProductGallery({
   name,
   onOpenLightbox,
   objectPosition,
+  priority = false,
 }: {
   images: { url: string }[]
   name: string
   onOpenLightbox: (images: string[], index: number, title: string) => void
   objectPosition?: string
+  priority?: boolean
 }) {
   const [view, setView] = useState(0)
+  const [mainLoaded, setMainLoaded] = useState(false)
   const views = images.length > 0 ? images.map(i => i.url) : [placeholder]
   const current = views[view] || views[0]
   return <div className="article-gallery">
     <img
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"
       className={'gallery-main view-' + view}
       src={current}
       alt={`${name} — vue ${view + 1}`}
+      onLoad={() => { if (!mainLoaded) setMainLoaded(true) }}
       onClick={() => onOpenLightbox(views, view, name)}
       style={{
         cursor: 'zoom-in',
         ...(objectPosition ? { objectPosition } : {})
       }}
     />
-    {views.length > 1 && <div className="gallery-thumbnails" aria-label={`Vues de ${name}`}>
-      {views.slice(0, 4).map((src, i) => <button key={i} type="button" aria-label={`Vue ${i + 1}`} aria-pressed={view === i} onClick={() => setView(i)}><img loading="lazy" decoding="async" src={src} alt="" /><span>Vue {i + 1}</span></button>)}
+    {views.length > 1 && mainLoaded && <div className="gallery-thumbnails" aria-label={`Vues de ${name}`}>
+      {views.slice(0, 4).map((src, i) => <button key={i} type="button" aria-label={`Vue ${i + 1}`} aria-pressed={view === i} onClick={() => setView(i)}><img loading="lazy" decoding="async" width="30" height="32" src={src} alt="" /><span>Vue {i + 1}</span></button>)}
     </div>}
   </div>
 }
@@ -1056,7 +1066,7 @@ export default function App() {
         <div className="marquee-track">
           {[0, 1].map(i => (
             <div className="marquee-content" key={i} aria-hidden={i > 0 ? 'true' : undefined}>
-              {[...MEDICAL_PARTNERS, ...MEDICAL_PARTNERS].map((partner, pIdx) => (
+              {MEDICAL_PARTNERS.map((partner, pIdx) => (
                 <span key={`${partner.alt}-${pIdx}`} className="brand-logo">
                   <img
                     src={partner.src}
@@ -1083,8 +1093,8 @@ export default function App() {
           </div>
         </div>)}
       </div> : <>
-      <div className="product-grid" aria-live="polite">{shown.slice(0, visibleCount).map(p => <article className="product modern-card" key={p.id} data-product-name={p.name}>
-        <div className="product-image"><ProductGallery images={p.images} name={p.name} onOpenLightbox={handleOpenLightbox} objectPosition={getProductObjectPosition(p.name)}/>{p.promoBadge && <span className="badge promo-badge">{p.promoBadge}</span>}{!p.inStock && <span className="badge out-of-stock-badge">Rupture</span>}{p.isFeatured && p.inStock && !p.promoBadge && <span className="badge">NOTRE SÉLECTION</span>}<button className={'favorite ' + (favorites.includes(p.id) ? 'liked' : '')} aria-label={`Favori : ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={() => setFavorites(items => items.includes(p.id) ? items.filter(id => id !== p.id) : [...items, p.id])}><Icon name="heart" size={18}/></button></div>
+      <div className="product-grid" aria-live="polite">{shown.slice(0, visibleCount).map((p, idx) => <article className="product modern-card" key={p.id} data-product-name={p.name}>
+        <div className="product-image"><ProductGallery images={p.images} name={p.name} onOpenLightbox={handleOpenLightbox} objectPosition={getProductObjectPosition(p.name)} priority={idx < 2}/>{p.promoBadge && <span className="badge promo-badge">{p.promoBadge}</span>}{!p.inStock && <span className="badge out-of-stock-badge">Rupture</span>}{p.isFeatured && p.inStock && !p.promoBadge && <span className="badge">NOTRE SÉLECTION</span>}<button className={'favorite ' + (favorites.includes(p.id) ? 'liked' : '')} aria-label={`Favori : ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={() => setFavorites(items => items.includes(p.id) ? items.filter(id => id !== p.id) : [...items, p.id])}><Icon name="heart" size={18}/></button></div>
         <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatMoney(p.price)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsList.length > 0 && <span>{p.colorsList.length} coloris</span>}{p.sizesList.length > 0 && <span>{p.sizesList.length} tailles</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
       </article>)}</div>
       {visibleCount < shown.length && (
@@ -1419,7 +1429,7 @@ export default function App() {
                   className="detail-carousel-img"
                   src={detailProduct.images[detailImgIdx]?.url || detailProduct.images[0]?.url || placeholder}
                   alt={`${detailProduct.name} - vue ${detailImgIdx + 1}`}
-                  crossOrigin="anonymous"
+                  decoding="async"
                   draggable={false}
                   onLoad={e => checkImgBrightness(e.currentTarget, setIsDetailImgLight)}
                   onClick={(e) => {
@@ -1572,7 +1582,7 @@ export default function App() {
             src={lightbox.images[lightbox.index]}
             alt={lightbox.title || "Photo du produit agrandie"}
             className="lightbox-img"
-            crossOrigin="anonymous"
+            decoding="async"
             draggable={false}
             onLoad={e => checkImgBrightness(e.currentTarget, setIsLightboxImgLight)}
             style={{ cursor: lightbox.images.length > 1 ? 'grab' : 'default' }}
