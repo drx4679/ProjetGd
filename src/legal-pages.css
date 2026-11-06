@@ -10,7 +10,7 @@
   box-sizing: border-box;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .legal-view-container {
     padding: 105px 18px 60px;
   }
@@ -21,21 +21,25 @@
   align-items: center;
   gap: 8px;
   padding: 8px 18px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface-light);
+  border: 1px solid var(--color-border-card);
   border-radius: 9999px;
-  color: #334155;
+  color: var(--color-ink-tertiary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
 }
 
 .legal-back-btn:hover {
   background: var(--color-accent, #087fb5);
   border-color: var(--color-accent, #087fb5);
-  color: #ffffff;
+  color: var(--color-white);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(8, 127, 181, 0.25);
 }
@@ -50,13 +54,13 @@
   font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 20px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-ink-strong);
   letter-spacing: -0.3px;
 }
 
 .legal-view-container p {
   line-height: 1.8;
-  color: #475569;
+  color: var(--color-ink-tertiary);
 }
 
 .legal-view-container .feature-card {
@@ -88,7 +92,7 @@
    SITE FOOTER ENRICHI (GoodDoctor's Shop)
    ======================================================== */
 .site-footer {
-  background: #f8fafc !important;
+  background: var(--color-surface-card) !important;
   border-top: 1px solid #e2e8f0 !important;
   padding: 60px 5% 32px !important;
   margin-top: 60px !important;
@@ -106,7 +110,7 @@
   grid-template-columns: 1.4fr 1.2fr 1fr 1fr;
   gap: 40px;
   padding-bottom: 40px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border-card);
 }
 
 .footer-col {
@@ -118,13 +122,13 @@
 .footer-brand-desc {
   font-size: 13px;
   line-height: 1.7;
-  color: #64748b;
+  color: var(--color-ink-placeholder);
   max-width: 280px;
 }
 
 .brand-highlight {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-ink-strong);
 }
 
 .footer-address {
@@ -132,7 +136,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-ink-placeholder);
 }
 
 .footer-col-title {
@@ -141,7 +145,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #0f172a;
+  color: var(--color-ink-strong);
   margin: 0;
 }
 
@@ -160,7 +164,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-ink-placeholder);
   text-decoration: none;
   background: none;
   border: none;
@@ -189,10 +193,10 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  transition: all 0.2s ease;
+  background: var(--color-white);
+  border: 1px solid var(--color-border-card);
+  color: var(--color-ink-placeholder);
+  transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .footer-socials a:hover {
@@ -204,7 +208,7 @@
 
 .footer-socials-note {
   font-size: 11.5px;
-  color: #94a3b8;
+  color: var(--color-ink-placeholder);
   line-height: 1.6;
 }
 
@@ -214,7 +218,7 @@
   align-items: center;
   padding-top: 24px;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--color-ink-placeholder);
   font-weight: 500;
   letter-spacing: 0.5px;
 }
@@ -226,7 +230,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .site-footer {
     padding: 40px 5% 24px !important;
     margin-top: 40px !important;

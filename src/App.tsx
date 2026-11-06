@@ -1,14 +1,15 @@
-import { useEffect, useState, useMemo, useCallback, useRef, useDeferredValue } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef, useDeferredValue, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import OrderTracking from './OrderTracking'
-import About from './About'
-import Privacy from './Privacy'
-import Cgv from './Cgv'
+const OrderTracking = lazy(() => import('./OrderTracking'))
+const About = lazy(() => import('./About'))
+const Privacy = lazy(() => import('./Privacy'))
+const Cgv = lazy(() => import('./Cgv'))
 import ModalShell from './ModalShell'
-import Checkout, { type PendingPaymentInfo } from './Checkout'
+const Checkout = lazy(() => import('./Checkout').then(m => ({ default: m.default })))
+import type { PendingPaymentInfo } from './Checkout'
 import { formatMoney } from './money'
 import { useProducts, type Product } from './useProducts'
-import MedicalNeuralCanvas from './MedicalNeuralCanvas'
+// MedicalNeuralCanvas retiré du rendu (display: none partout) — conservé dans le repo pour réactivation future
 
 const photos = {
   hero: '/IMG_8380.jpeg',
@@ -207,6 +208,46 @@ export default function App() {
   }, [cart])
 
   const [pendingOrder, setPendingOrder] = useState<PendingPaymentInfo | null>(null)
+
+  // ── DÉTECTION HORS-LIGNE (PWA & RÉSILIENCE RÉSEAU TOGO) ──
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  // ── GESTION DU THÈME (CLAIR / SOMBRE HOSPITALIER) ──
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('gd_theme')
+      if (saved === 'dark' || saved === 'light') return saved
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('gd_theme', theme) } catch {}
+    const root = document.documentElement
+    if (theme === 'dark') {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    } else {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    }
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))
+  }, [])
 
   // ── RESTAURATION ET SAUVEGARDE DE LA POSITION AU RECHARGEMENT DU SITE ──
   const restoredScrollRef = useRef(false)
@@ -557,6 +598,39 @@ export default function App() {
     }))
   }
 
+  const [lastRemovedItem, setLastRemovedItem] = useState<{ item: CartItem; index: number; name: string } | null>(null)
+  const undoTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current)
+    }
+  }, [])
+
+  const handleRemoveCartItem = useCallback((index: number) => {
+    const itemToRemove = cart[index]
+    if (!itemToRemove) return
+    const p = products.find(prod => prod.id === itemToRemove.productId)
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current)
+    setLastRemovedItem({ item: itemToRemove, index, name: p?.name || 'Article' })
+    setCart(items => items.filter((_, j) => j !== index))
+    undoTimeoutRef.current = window.setTimeout(() => {
+      setLastRemovedItem(null)
+    }, 6000)
+  }, [cart, products])
+
+  const handleUndoRemove = useCallback(() => {
+    if (!lastRemovedItem) return
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current)
+    setCart(items => {
+      const next = [...items]
+      const insertIdx = Math.min(lastRemovedItem.index, next.length)
+      next.splice(insertIdx, 0, lastRemovedItem.item)
+      return next
+    })
+    setLastRemovedItem(null)
+  }, [lastRemovedItem])
+
   const [panel, setPanel] = useState('')
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
@@ -723,7 +797,21 @@ export default function App() {
   return <div>
     <a className="skip-link" href="#main-content">Aller au contenu</a>
     <div className="sticky-header">
-    <div className="announcement">LIVRAISON EXPRESS DISPONIBLE</div>
+      {isOffline && (
+        <div className="offline-banner" role="status" aria-live="polite">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="1" y1="1" x2="23" y2="23" />
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+            <line x1="12" y1="20" x2="12.01" y2="20" />
+          </svg>
+          <span>Mode hors-ligne · Catalogue enregistré disponible</span>
+        </div>
+      )}
+      <div className="announcement">LIVRAISON EXPRESS DISPONIBLE</div>
     <header className="header">
       <a href="#" className="logo shop-logo" aria-label="GoodDoctor's Shop accueil" onClick={(e) => { e.preventDefault(); setFilter('Tout'); navigateToView('home'); }}>
         <img src="/logo.webp" alt="Logo GoodDoctor's Shop" className="header-logo" width="36" height="36" />
@@ -744,13 +832,60 @@ export default function App() {
         >
           Suivre ma commande
         </button>
-        <button
-          type="button"
-          className={currentView === 'about' ? 'active' : ''}
-          onClick={() => { setPanel(''); setDetailProduct(null); navigateToView('about'); }}
-        >
-          À Propos
-        </button>
+        <div className="nav-about-group">
+          <button
+            type="button"
+            className={currentView === 'about' ? 'active' : ''}
+            onClick={() => { setPanel(''); setDetailProduct(null); navigateToView('about'); }}
+          >
+            À Propos
+          </button>
+          <button
+            type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? "Basculer vers le thème clair" : "Basculer vers le thème sombre"}
+            title={theme === 'dark' ? "Activer le thème clair" : "Activer le thème sombre"}
+          >
+            {theme === 'dark' ? (
+              <svg
+                className="theme-svg-icon"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4.25" fill="currentColor" fillOpacity="0.2" />
+                <path d="M12 2v2.2M12 19.8v2.2M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2 12h2.2M19.8 12h2.2M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56" />
+              </svg>
+            ) : (
+              <svg
+                className="theme-svg-icon"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"
+                  fill="currentColor"
+                  fillOpacity="0.14"
+                />
+                <path d="M19 2.5v3M20.5 4h-3" strokeWidth="1.5" />
+              </svg>
+            )}
+          </button>
+        </div>
       </nav>
       <div className="header-actions">
         <button
@@ -773,7 +908,7 @@ export default function App() {
             {favorites.length > 0 && <span className="fav-counter">{favorites.length}</span>}
           </span>
         </button>
-        <button aria-label="Ouvrir le panier" className="cart-button" onClick={() => setPanel('cart')}><Icon name="bag"/><span>{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></button>
+        <button aria-label="Ouvrir le panier" className="cart-button" onClick={() => setPanel('cart')}><Icon name="bag"/><span aria-live="polite" aria-atomic="true">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></button>
       </div>
     </header>
     {panel === 'search' && (
@@ -869,25 +1004,35 @@ export default function App() {
     )}
     </div>
     <main id="main-content" tabIndex={-1}>
-      {currentView === 'tracking' && <OrderTracking products={products} onBack={() => navigateToView('home')} />}
-      {currentView === 'about' && <About onBack={() => navigateToView('home')} />}
-      {currentView === 'privacy' && <Privacy onBack={() => navigateToView('home')} />}
-      {currentView === 'cgv' && <Cgv onBack={() => navigateToView('home')} />}
+      {currentView === 'tracking' && <Suspense fallback={null}><OrderTracking products={products} onBack={() => navigateToView('home')} /></Suspense>}
+      {currentView === 'about' && <Suspense fallback={null}><About onBack={() => navigateToView('home')} /></Suspense>}
+      {currentView === 'privacy' && <Suspense fallback={null}><Privacy onBack={() => navigateToView('home')} /></Suspense>}
+      {currentView === 'cgv' && <Suspense fallback={null}><Cgv onBack={() => navigateToView('home')} /></Suspense>}
       <div hidden={currentView !== 'home'}>
       <section className="hero">
-        <img className="hero-photo" src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" />
-        <div className="hero-abstract" aria-hidden="true">
-          <MedicalNeuralCanvas />
-        </div>
+        <img className="hero-photo" src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" fetchPriority="high" />
+        {/* MedicalNeuralCanvas: masqué par CSS à toutes les tailles, rendu conditionnel supprimé pour perf */}
         <div className="hero-shade"/>
-        <div className="hero-content"><h1>L'empreinte<br/>de la Qualite.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande" onClick={(e) => { e.preventDefault(); setPanel(''); setDetailProduct(null); navigateToView('tracking'); }}><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
+        <div className="hero-content"><h1>L'empreinte<br/>de la Qualité.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande" onClick={(e) => { e.preventDefault(); setPanel(''); setDetailProduct(null); navigateToView('tracking'); }}><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
         <div className="hero-bottom"><button className="ml-auto" aria-label="Découvrir nos gammes" onClick={() => go()}>↓</button></div>
         <div className="hero-sticker">PROMO<br/><b>EXCLUSIF</b></div>
       </section>
       <section className="benefits benefits-trio">
-        <div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7l-9-4Z"/><path d="m8 12 3 3 5-6"/></svg><p><b>Articles</b><span>Certifiés</span></p></div>
-        <div><Icon name="truck"/><p><b>Livraison</b><span>24-48h</span></p></div>
-        <div><Icon name="heart"/><p><b>Satisfaction</b><span>Garantie</span></p></div>
+        <div>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7l-9-4Z"/>
+            <path d="m8 12 3 3 5-6"/>
+          </svg>
+          <p><b>Articles</b><span>Certifiés</span></p>
+        </div>
+        <div>
+          <Icon name="truck"/>
+          <p><b>Livraison</b><span>24-48h</span></p>
+        </div>
+        <div>
+          <Icon name="heart"/>
+          <p><b>Satisfaction</b><span>Garantie</span></p>
+        </div>
       </section>
 
       {/* ── PARTENAIRES MÉDICAUX MARQUEE (comme sur l'ancien site) ── */}
@@ -926,10 +1071,19 @@ export default function App() {
           ))}
         </div>
       </section>
-      <section className="section selection" id="selection"><div className="section-title"><div><div className="eyebrow">VOTRE ÉQUIPEMENT PROFESSIONNEL</div><h2>{panel === 'favorites' ? 'Vos équipements favoris.' : catalog ? 'Notre catalogue médical.' : 'Notre sélection pour les soignants.'}</h2></div><button className="text-link" onClick={() => { setPanel(''); setFilter('Tout'); setSearch(''); setCatalog(true) }}>Voir tout le catalogue <Icon name="arrow" size={18}/></button></div><div className="filters">{filterCategories.map(f => <button key={f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div>{catalog && <div className="catalog-toolbar"><label htmlFor="catalog-sort-select">Trier par <select id="catalog-sort-select" name="catalog_sort" value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Notre sélection</option><option value="ascending">Prix croissant</option><option value="descending">Prix décroissant</option></select></label><button onClick={() => { setFilter('Tout'); setSearch(''); setSort('featured') }}>Réinitialiser les filtres</button></div>}
+      <section className="section selection" id="selection"><div className="section-title"><div><h2>{panel === 'favorites' ? 'Vos équipements favoris.' : catalog ? 'Notre catalogue médical.' : 'Notre sélection pour les soignants.'}</h2></div><button className="text-link" onClick={() => { setPanel(''); setFilter('Tout'); setSearch(''); setCatalog(true) }}>Voir tout le catalogue <Icon name="arrow" size={18}/></button></div><div className="filters" role="tablist" aria-label="Filtrer par catégorie">{filterCategories.map(f => <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div>{catalog && <div className="catalog-toolbar"><label htmlFor="catalog-sort-select">Trier par <select id="catalog-sort-select" name="catalog_sort" value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Notre sélection</option><option value="ascending">Prix croissant</option><option value="descending">Prix décroissant</option></select></label><button onClick={() => { setFilter('Tout'); setSearch(''); setSort('featured') }}>Réinitialiser les filtres</button></div>}
 
-      {loading ? <p className="empty">Chargement du catalogue…</p> : <>
-      <div className="product-grid">{shown.slice(0, visibleCount).map(p => <article className="product modern-card" key={p.id} data-product-name={p.name}>
+      {loading ? <div className="product-grid" aria-busy="true" aria-label="Chargement du catalogue">
+        {[1,2,3,4].map(i => <div className="skeleton-card" key={i}>
+          <div className="skeleton-image" />
+          <div className="skeleton-body">
+            <div className="skeleton-line skeleton-line--short" />
+            <div className="skeleton-line" />
+            <div className="skeleton-line skeleton-line--medium" />
+          </div>
+        </div>)}
+      </div> : <>
+      <div className="product-grid" aria-live="polite">{shown.slice(0, visibleCount).map(p => <article className="product modern-card" key={p.id} data-product-name={p.name}>
         <div className="product-image"><ProductGallery images={p.images} name={p.name} onOpenLightbox={handleOpenLightbox} objectPosition={getProductObjectPosition(p.name)}/>{p.promoBadge && <span className="badge promo-badge">{p.promoBadge}</span>}{!p.inStock && <span className="badge out-of-stock-badge">Rupture</span>}{p.isFeatured && p.inStock && !p.promoBadge && <span className="badge">NOTRE SÉLECTION</span>}<button className={'favorite ' + (favorites.includes(p.id) ? 'liked' : '')} aria-label={`Favori : ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={() => setFavorites(items => items.includes(p.id) ? items.filter(id => id !== p.id) : [...items, p.id])}><Icon name="heart" size={18}/></button></div>
         <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatMoney(p.price)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsList.length > 0 && <span>{p.colorsList.length} coloris</span>}{p.sizesList.length > 0 && <span>{p.sizesList.length} tailles</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
       </article>)}</div>
@@ -947,9 +1101,37 @@ export default function App() {
       )}
       {shown.length === 0 && <p className="empty">Aucun équipement ne correspond à votre recherche. Explorez les autres catégories du catalogue.</p>}</>}
       </section>
+
+      {/* ── COMMENT COMMANDER : 3 ÉTAPES CLAIRES ET RASSURANTES ── */}
+      <section className="order-steps" aria-labelledby="order-steps-title">
+        <div className="order-steps-container">
+          <div className="section-title">
+            <div>
+              <h2 id="order-steps-title">Commander en toute simplicité.</h2>
+            </div>
+          </div>
+          <div className="order-steps-grid">
+            <div className="order-step-card">
+              <span className="order-step-badge" aria-hidden="true">01</span>
+              <h3>Choisissez vos articles</h3>
+              <p>Sélectionnez vos uniformes et dispositifs médicaux certifiés avec vos variantes de tailles et de couleurs.</p>
+            </div>
+            <div className="order-step-card">
+              <span className="order-step-badge" aria-hidden="true">02</span>
+              <h3>Validez votre panier</h3>
+              <p>Confirmez votre sélection en un instant. Réglez en toute sécurité via CashPay (Mixx by Yas, Moov Money) ou à la livraison.</p>
+            </div>
+            <div className="order-step-card">
+              <span className="order-step-badge" aria-hidden="true">03</span>
+              <h3>Livraison express à Lomé</h3>
+              <p>Recevez vos équipements directement à votre clinique, cabinet médical ou à domicile sous 24 à 48 heures.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="newsletter">
         <div>
-          <div className="eyebrow">LES ACTUALITÉS DE VOTRE ÉQUIPEMENT MÉDICAL</div>
           <h2>Restez informés, équipez-vous mieux.</h2>
           <p>Nouveaux uniformes, dispositifs, accessoires et offres pour les professionnels de santé.</p>
         </div>
@@ -1018,12 +1200,13 @@ export default function App() {
           </div>
           {newsletterMessage ? (
             <small
+              role="alert"
               style={{
-                color: newsletterMessage.isError ? '#dc2626' : '#15803d',
+                color: newsletterMessage.isError ? 'var(--color-error, #dc2626)' : 'var(--color-success, #15803d)',
                 fontWeight: 600,
                 display: 'block',
                 marginTop: '10px',
-                fontSize: '11px',
+                fontSize: '12px',
               }}
             >
               {newsletterMessage.text}
@@ -1037,16 +1220,8 @@ export default function App() {
                   En vous inscrivant, vous acceptez notre{' '}
                   <button
                     type="button"
+                    className="inline-link"
                     onClick={() => { setPanel(''); setDetailProduct(null); navigateToView('privacy'); }}
-                    style={{
-                      textDecoration: 'underline',
-                      background: 'none',
-                      border: 'none',
-                      color: 'inherit',
-                      font: 'inherit',
-                      padding: 0,
-                      cursor: 'pointer',
-                    }}
                   >
                     politique de confidentialité
                   </button>.
@@ -1433,6 +1608,7 @@ export default function App() {
           setPanel(cart.length > 0 ? 'cart' : '')
         }}
       >
+        <Suspense fallback={null}>
         <Checkout
           subtotal={subtotal}
           items={cart.map(item => {
@@ -1457,13 +1633,143 @@ export default function App() {
             navigateToView(view)
           }}
         />
+        </Suspense>
       </ModalShell>
     )}
-    {panel === 'cart' && <ModalShell label="Votre panier" onClose={() => setPanel('')}><div className="drawer-heading"><h2>Votre panier ({cart.reduce((sum, item) => sum + item.quantity, 0)})</h2><button onClick={() => setPanel('')} aria-label="Fermer">×</button></div>{cart.length ? <>{cart.map((item, i) => {
-      const p = products.find(p => p.id === item.productId)
-      if (!p) return null
-      return <div className="cart-item" key={i}><img src={p.images[0]?.url || placeholder} alt={p.name}/><div className="cart-item-content"><b>{p.name}</b><p>{formatMoney(p.price)} / pièce</p><div className="variant-fields"><label htmlFor={`cart-size-${i}`}>Taille/Format<select id={`cart-size-${i}`} name={`cart_size_${i}`} aria-label={`Format de ${p.name}, article ${i + 1}`} value={item.size} onChange={e => updateCartItem(i, { size: e.target.value })}>{(p.sizesList.length > 0 ? p.sizesList : ['Unique']).map(size => <option key={size}>{size}</option>)}</select></label><label htmlFor={`cart-color-${i}`}>Couleur<select id={`cart-color-${i}`} name={`cart_color_${i}`} aria-label={`Couleur de ${p.name}, article ${i + 1}`} value={item.color} onChange={e => updateCartItem(i, { color: e.target.value })}>{(p.colorsList.length > 0 ? p.colorsList : ['Standard']).map(color => <option key={color}>{color}</option>)}</select></label></div><div className="cart-item-bottom"><div className="quantity-control"><button aria-label={`Diminuer la quantité de ${p.name}`} disabled={item.quantity === 1} onClick={() => updateCartItem(i, { quantity: item.quantity - 1 })}>−</button><output aria-live="polite">{item.quantity}</output><button aria-label={`Augmenter la quantité de ${p.name}`} disabled={item.quantity === 99} onClick={() => updateCartItem(i, { quantity: item.quantity + 1 })}>+</button></div><button onClick={() => setCart(items => items.filter((_, j) => j !== i))}>Retirer</button><b>{formatMoney(p.price * item.quantity)}</b></div><div className="variant-actions"><button className={item.confirmed ? 'variant-confirmed' : 'variant-confirm'} onClick={() => updateCartItem(i, { confirmed: !item.confirmed })}>{item.confirmed ? 'Sélection validée · Modifier' : 'Valider cette sélection'}</button>{item.confirmed && <button className="variant-add" onClick={() => setCart(items => [...items, { ...item, quantity: 1, confirmed: false }])}>+ Ajouter une autre variante</button>}<span className="variant-summary" role="status">{item.confirmed ? `${item.color} · ${item.size} · Quantité : ${item.quantity}` : 'Choisissez le format, la couleur et la quantité, puis validez.'}</span></div></div></div>
-    })}<div className="total"><b>{cart.some(item => !item.confirmed) ? 'Total provisoire' : 'Total validé'}</b><b>{formatMoney(subtotal)}</b></div><button className="primary checkout-button" disabled={cart.some(item => !item.confirmed)} onClick={() => { setPendingOrder(null); setPanel('checkout'); }}>Continuer vers le paiement</button><p className="demo-note">{cart.some(item => !item.confirmed) ? 'Certaines sélections restent à valider.' : 'Toutes vos variantes sont validées.'}</p></> : <p className="empty">Votre panier est vide. Découvrez nos uniformes, dispositifs et accessoires médicaux.</p>}<button className="primary" onClick={() => { setPanel(''); go() }}>Continuer mes achats <Icon name="arrow"/></button></ModalShell>}
+    {panel === 'cart' && (
+      <ModalShell label="Votre panier" onClose={() => setPanel('')}>
+        <div className="drawer-heading">
+          <h2>Votre panier ({cart.reduce((sum, item) => sum + item.quantity, 0)})</h2>
+          <button onClick={() => setPanel('')} aria-label="Fermer">×</button>
+        </div>
+
+        {lastRemovedItem && (
+          <div className="cart-undo-banner" role="status" aria-live="polite">
+            <span className="cart-undo-text">« {lastRemovedItem.name} » retiré du panier.</span>
+            <button type="button" onClick={handleUndoRemove} className="cart-undo-action">
+              Annuler
+            </button>
+          </div>
+        )}
+
+        {cart.length ? (
+          <>
+            {cart.map((item, i) => {
+              const p = products.find(p => p.id === item.productId)
+              if (!p) return null
+              return (
+                <div className="cart-item" key={i}>
+                  <img src={p.images[0]?.url || placeholder} alt={p.name} loading="lazy" decoding="async" />
+                  <div className="cart-item-content">
+                    <b>{p.name}</b>
+                    <p>{formatMoney(p.price)} / pièce</p>
+                    <div className="variant-fields">
+                      <label htmlFor={`cart-size-${i}`}>
+                        Taille/Format
+                        <select
+                          id={`cart-size-${i}`}
+                          name={`cart_size_${i}`}
+                          aria-label={`Format de ${p.name}, article ${i + 1}`}
+                          value={item.size}
+                          onChange={e => updateCartItem(i, { size: e.target.value })}
+                        >
+                          {(p.sizesList.length > 0 ? p.sizesList : ['Unique']).map(size => (
+                            <option key={size}>{size}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label htmlFor={`cart-color-${i}`}>
+                        Couleur
+                        <select
+                          id={`cart-color-${i}`}
+                          name={`cart_color_${i}`}
+                          aria-label={`Couleur de ${p.name}, article ${i + 1}`}
+                          value={item.color}
+                          onChange={e => updateCartItem(i, { color: e.target.value })}
+                        >
+                          {(p.colorsList.length > 0 ? p.colorsList : ['Standard']).map(color => (
+                            <option key={color}>{color}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="cart-item-bottom">
+                      <div className="quantity-control">
+                        <button
+                          aria-label={`Diminuer la quantité de ${p.name}`}
+                          disabled={item.quantity === 1}
+                          onClick={() => updateCartItem(i, { quantity: item.quantity - 1 })}
+                        >
+                          −
+                        </button>
+                        <output aria-live="polite">{item.quantity}</output>
+                        <button
+                          aria-label={`Augmenter la quantité de ${p.name}`}
+                          disabled={item.quantity === 99}
+                          onClick={() => updateCartItem(i, { quantity: item.quantity + 1 })}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="cart-remove-btn"
+                        onClick={() => handleRemoveCartItem(i)}
+                      >
+                        Retirer
+                      </button>
+                      <b>{formatMoney(p.price * item.quantity)}</b>
+                    </div>
+                    <div className="variant-actions">
+                      <button
+                        className={item.confirmed ? 'variant-confirmed' : 'variant-confirm'}
+                        onClick={() => updateCartItem(i, { confirmed: !item.confirmed })}
+                      >
+                        {item.confirmed ? 'Sélection validée · Modifier' : 'Valider cette sélection'}
+                      </button>
+                      {item.confirmed && (
+                        <button
+                          className="variant-add"
+                          onClick={() => setCart(items => [...items, { ...item, quantity: 1, confirmed: false }])}
+                        >
+                          + Ajouter une autre variante
+                        </button>
+                      )}
+                      <span className="variant-summary" role="status">
+                        {item.confirmed
+                          ? `${item.color} · ${item.size} · Quantité : ${item.quantity}`
+                          : 'Choisissez le format, la couleur et la quantité, puis validez.'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="total">
+              <b>{cart.some(item => !item.confirmed) ? 'Total provisoire' : 'Total validé'}</b>
+              <b>{formatMoney(subtotal)}</b>
+            </div>
+            <button
+              className="primary checkout-button"
+              disabled={cart.some(item => !item.confirmed)}
+              onClick={() => { setPendingOrder(null); setPanel('checkout'); }}
+            >
+              Continuer vers le paiement
+            </button>
+            <p className="demo-note">
+              {cart.some(item => !item.confirmed)
+                ? 'Certaines sélections restent à valider.'
+                : 'Toutes vos variantes sont validées.'}
+            </p>
+          </>
+        ) : (
+          <p className="empty">Votre panier est vide. Découvrez nos uniformes, dispositifs et accessoires médicaux.</p>
+        )}
+        <button className="primary" onClick={() => { setPanel(''); go() }}>
+          Continuer mes achats <Icon name="arrow" />
+        </button>
+      </ModalShell>
+    )}
     {toastMessage && (
       <div className="share-toast" role="status" aria-live="polite">
         <Icon name="share" size={16} />

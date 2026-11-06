@@ -89,7 +89,7 @@ export default function Privacy({ onBack }: PrivacyProps) {
             Sécurité des paiements &amp; Protection des données
           </h2>
           <p>
-            <strong>Aucune coordonnée bancaire, aucun code secret T-Money, Moov Money ou numéro de carte ne transite ni n'est stocké sur nos serveurs.</strong>
+            <strong>Aucune coordonnée bancaire, aucun code secret Mixx by Yas, Moov Money ou numéro de carte ne transite ni n'est stocké sur nos serveurs.</strong>
           </p>
           <p style={{ marginTop: "8px" }}>
             L'ensemble des transactions financières est délégué à notre partenaire agréé <strong>CashPay</strong> via des protocoles de chiffrement bancaire sécurisés et certifiés.

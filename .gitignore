@@ -18,3 +18,7 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+/.agent/
+/.agents/
+/.impeccable/
+skills-lock.json

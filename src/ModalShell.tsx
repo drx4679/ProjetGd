@@ -1,10 +1,24 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function ModalShell({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLElement>(null)
   const close = useRef(onClose)
   close.current = onClose
+
+  /* ── Exit animation state machine ── */
+  const [closing, setClosing] = useState(false)
+  const handleCloseRef = useRef<() => void>(() => {})
+  const handleClose = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(() => {
+      setClosing(false)
+      close.current()
+    }, 200) // matches CSS animation duration
+  }, [closing])
+  handleCloseRef.current = handleClose
+
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     const root = document.getElementById('root')
@@ -16,7 +30,7 @@ export default function ModalShell({ label, onClose, children }: { label: string
     const onKey = (event: KeyboardEvent) => {
       // Si une sous-modale (ex: #map-modal) est ouverte au-dessus, lui laisser la gestion du clavier
       if (document.getElementById('map-modal')) return
-      if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
+      if (event.key === 'Escape') { event.preventDefault(); handleCloseRef.current(); return }
       if (event.key !== 'Tab') return
       const nodes = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), summary, iframe, [tabindex="0"]') ?? [])
         .filter(node => node.getClientRects().length > 0)
@@ -37,5 +51,23 @@ export default function ModalShell({ label, onClose, children }: { label: string
       previous?.focus()
     }
   }, [])
-  return createPortal(<div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}><aside ref={dialog} className="drawer" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</aside></div>, document.body)
+
+  return createPortal(
+    <div
+      className={`overlay${closing ? ' closing' : ''}`}
+      onClick={e => { if (e.target === e.currentTarget) handleClose() }}
+    >
+      <aside
+        ref={dialog}
+        className={`drawer${closing ? ' closing' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+      >
+        {children}
+      </aside>
+    </div>,
+    document.body
+  )
 }

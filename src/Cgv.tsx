@@ -110,7 +110,7 @@ export default function Cgv({ onBack }: CgvProps) {
             Le règlement s'effectue en ligne via la plateforme agréée <strong>CashPay</strong>. Plusieurs moyens de règlement sont mis à votre disposition :
           </p>
           <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
-            <li><strong>Mobile Money Togo &amp; Sous-région :</strong> Moov Money, Mixx by Yas (T-Money), Coris Money.</li>
+            <li><strong>Mobile Money Togo &amp; Sous-région :</strong> Mixx by Yas, Moov Money, Coris Money.</li>
             <li><strong>Cartes bancaires internationales :</strong> Visa et Mastercard.</li>
           </ul>
           <p style={{ marginTop: "8px" }}>

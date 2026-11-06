@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import MapModal from './MapModal'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
+const MapModal = lazy(() => import('./MapModal'))
 import { formatMoney as money } from './money'
 import { createOrder, getOrderStatus, generateMerchantRef, isTrustedCashPayUrl, type CashPayOrderItem } from './cashpay'
 import { sanitizeUserErrorMessage } from './errorSanitizer'
@@ -553,7 +553,7 @@ export default function Checkout({
                 </svg>
                 <span>Paiement sécurisé</span>
               </div>
-              <p>Moov Money · Mixx · Coris Money · Carte bancaire (Visa, Mastercard)</p>
+              <p>Mixx by Yas · Moov Money · Coris Money · Carte bancaire (Visa, Mastercard)</p>
             </div>
 
             {/* Case à cocher CGV & Politique de confidentialité */}
@@ -749,12 +749,14 @@ export default function Checkout({
       )}
 
       {/* Modale Carte interactive Leaflet (conforme D:\Ecom site web) */}
+      <Suspense fallback={null}>
       <MapModal
         open={mapOpen}
         initialCoords={deliveryCoords}
         onClose={() => setMapOpen(false)}
         onConfirm={handleMapConfirm}
       />
+      </Suspense>
     </div>
   )
 }
