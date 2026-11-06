@@ -1104,8 +1104,10 @@ export default function App() {
             className="load-more-btn"
             onClick={() => setVisibleCount(prev => prev + 5)}
           >
-            <Icon name="plus" size={16} />
-            <span>Charger plus d'articles</span>
+            <span className="load-more-icon-wrap" aria-hidden="true">
+              <Icon name="plus" size={15} />
+            </span>
+            <span className="load-more-label">Charger plus d'articles</span>
           </button>
         </div>
       )}
