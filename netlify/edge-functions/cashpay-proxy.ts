@@ -764,7 +764,14 @@ export default async (req: Request, context: Context) => {
         }
       }
 
-      return await buildJweResponse(cashpayData, cpResponse.status, secHeaders, req.headers.get("x-pub-key"))
+      const safeResponsePayload = {
+        order_reference: cashpayData.order_reference || merchant_reference,
+        bill_url: cashpayData.bill_url || "",
+        state: cashpayData.state || "pending",
+        status: cashpayData.status || "pending",
+      }
+
+      return await buildJweResponse(safeResponsePayload, cpResponse.status, secHeaders, req.headers.get("x-pub-key"))
     }
 
     // ══════════════════════════════════════════════════════════════
