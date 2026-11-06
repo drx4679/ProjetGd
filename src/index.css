@@ -1,5 +1,6 @@
 /* Google Fonts chargées via <link> dans index.html pour éviter le render-blocking */
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 @import './product-cards.css';
 @import './tracking.css';
 @import './polish.css';

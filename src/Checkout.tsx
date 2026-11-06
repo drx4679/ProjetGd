@@ -557,7 +557,7 @@ export default function Checkout({
             </div>
 
             {/* Case à cocher CGV & Politique de confidentialité */}
-            <div style={{ margin: '18px 2px 6px', fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#475569' }}>
+            <div style={{ margin: '18px 2px 6px', fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'var(--color-ink-secondary, #475569)' }}>
               <input
                 type="checkbox"
                 id="agree-legal"
@@ -651,18 +651,18 @@ export default function Checkout({
           {orderInfo?.orderRef && (
             <div
               style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                background: 'var(--color-surface-card, #f8fafc)',
+                border: '1px solid var(--color-border-card, #e2e8f0)',
                 borderRadius: '10px',
                 padding: '14px 16px',
                 marginBottom: '16px',
                 textAlign: 'center',
               }}
             >
-              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1.2px', color: '#64748b', fontWeight: 700 }}>
+              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--color-ink-subtle, #64748b)', fontWeight: 700 }}>
                 Référence commande
               </span>
-              <p style={{ fontSize: '16px', fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', margin: '4px 0 0' }}>
+              <p style={{ fontSize: '16px', fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-ink-strong, #0f172a)', margin: '4px 0 0' }}>
                 {orderInfo.orderRef}
               </p>
             </div>

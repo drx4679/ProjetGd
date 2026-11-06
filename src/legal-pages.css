@@ -92,8 +92,8 @@
    SITE FOOTER ENRICHI (GoodDoctor's Shop)
    ======================================================== */
 .site-footer {
-  background: var(--color-surface-card) !important;
-  border-top: 1px solid #e2e8f0 !important;
+  background: var(--color-surface-card);
+  border-top: 1px solid var(--color-border-card);
   padding: 60px 5% 32px !important;
   margin-top: 60px !important;
   width: 100% !important;
@@ -244,5 +244,106 @@
     gap: 8px;
     text-align: center;
   }
+}
+
+/* ========================================================
+   MODE SOMBRE POUR LES PAGES LÉGALES & À PROPOS
+   ======================================================== */
+:root.dark .legal-view-container,
+:root:not(.light) .legal-view-container {
+  color: #cbd5e1;
+}
+
+:root.dark .legal-view-container h1,
+:root:not(.light) .legal-view-container h1 {
+  color: #f8fafc !important;
+}
+
+:root.dark .legal-view-container h2,
+:root:not(.light) .legal-view-container h2 {
+  color: #f8fafc !important;
+}
+
+:root.dark .legal-view-container h3,
+:root:not(.light) .legal-view-container h3 {
+  color: #f8fafc !important;
+}
+
+:root.dark .legal-view-container p,
+:root:not(.light) .legal-view-container p,
+:root.dark .legal-view-container li,
+:root:not(.light) .legal-view-container li {
+  color: #cbd5e1 !important;
+}
+
+:root.dark .legal-view-container strong,
+:root:not(.light) .legal-view-container strong {
+  color: #f8fafc !important;
+}
+
+:root.dark .legal-view-container .feature-card,
+:root:not(.light) .legal-view-container .feature-card {
+  background: #181d19 !important;
+  border-color: #283029 !important;
+}
+
+:root.dark .legal-view-container .feature-card h3,
+:root:not(.light) .legal-view-container .feature-card h3 {
+  color: #f8fafc !important;
+}
+
+:root.dark .legal-view-container .feature-card p,
+:root:not(.light) .legal-view-container .feature-card p {
+  color: #94a3b8 !important;
+}
+
+:root.dark .legal-view-container .feature-card div,
+:root:not(.light) .legal-view-container .feature-card div {
+  background: #1e241f !important;
+  border-color: #283029 !important;
+}
+
+:root.dark .legal-back-btn,
+:root:not(.light) .legal-back-btn {
+  background: #181d19 !important;
+  border-color: #283029 !important;
+  color: #cbd5e1 !important;
+}
+
+:root.dark .legal-back-btn:hover,
+:root:not(.light) .legal-back-btn:hover {
+  background: #087fb5 !important;
+  border-color: #087fb5 !important;
+  color: #ffffff !important;
+}
+
+:root.dark .legal-view-container div[style*="background: #f8fafc"],
+:root.dark .legal-view-container div[style*="background:#f8fafc"],
+:root:not(.light) .legal-view-container div[style*="background: #f8fafc"],
+:root:not(.light) .legal-view-container div[style*="background:#f8fafc"] {
+  background: #181d19 !important;
+  border-color: #283029 !important;
+}
+
+:root.dark .legal-view-container div[style*="background: #f8fafc"] p,
+:root.dark .legal-view-container div[style*="background:#f8fafc"] p,
+:root:not(.light) .legal-view-container div[style*="background: #f8fafc"] p,
+:root:not(.light) .legal-view-container div[style*="background:#f8fafc"] p {
+  color: #e2e8f0 !important;
+}
+
+:root.dark .legal-view-container div[style*="borderBottom"],
+:root.dark .legal-view-container div[style*="border-bottom"],
+:root:not(.light) .legal-view-container div[style*="borderBottom"],
+:root:not(.light) .legal-view-container div[style*="border-bottom"] {
+  border-bottom-color: #283029 !important;
+}
+
+:root.dark .legal-view-container span[style*="background: #e0f2fe"],
+:root.dark .legal-view-container span[style*="background:#e0f2fe"],
+:root:not(.light) .legal-view-container span[style*="background: #e0f2fe"],
+:root:not(.light) .legal-view-container span[style*="background:#e0f2fe"] {
+  background: #1e293b !important;
+  color: #38bdf8 !important;
 }
 

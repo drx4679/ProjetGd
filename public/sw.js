@@ -1,5 +1,5 @@
 // Service Worker — GoodDoctor's Shop (PWA & Offline Resilience)
-const CACHE_NAME = 'gooddoctor-cache-v1';
+const CACHE_NAME = 'gooddoctor-cache-v2';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -9,16 +9,17 @@ const PRECACHE_URLS = [
   '/no-image.svg'
 ];
 
-// Installation : mise en cache des ressources critiques
+// Installation : mise en cache des ressources critiques locales
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_URLS);
-    }).then(() => self.skipWaiting())
+      return cache.addAll(PRECACHE_URLS).catch(() => {});
+    })
   );
 });
 
-// Activation : nettoyage des anciens caches
+// Activation : nettoyage immédiat des anciens caches (v1, etc.)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -31,18 +32,28 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Interception des requêtes
+// Interception des requêtes — UNIQUEMENT même origine (évite tout blocage CSP connect-src sur les images Supabase/Unsplash)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // On ignore les requêtes non-GET et les requêtes hors HTTP(S)
-  if (request.method !== 'GET' || !request.url.startsWith('http')) {
+  if (request.method !== 'GET') {
     return;
   }
 
   const url = new URL(request.url);
 
-  // 1. API Produits : Network-First avec repli sur le cache (permet de consulter le catalogue sans connexion)
+  // Ne jamais intercepter les requêtes cross-origin (Supabase Storage, Unsplash, Google Fonts, OpenStreetMap...) :
+  // le navigateur les charge directement via img-src / font-src / style-src avec leur cache HTTP natif.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Ne pas intercepter les appels API dynamiques hors /api/products (ex: /api/cashpay-proxy, /api/newsletter)
+  if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/products')) {
+    return;
+  }
+
+  // 1. API Produits : Network-First avec repli sur le cache uniquement si hors-ligne
   if (url.pathname.startsWith('/api/products')) {
     event.respondWith(
       fetch(request)
@@ -55,52 +66,47 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || Response.error();
+        })
     );
     return;
   }
 
-  // 2. Polices Google & images externes : Stale-While-Revalidate
-  if (
-    url.hostname.includes('fonts.googleapis.com') ||
-    url.hostname.includes('fonts.gstatic.com') ||
-    url.hostname.includes('supabase.co')
-  ) {
+  // 2. Fichiers statiques internes (JS, CSS, images locales) : Network-First pour HTML, Cache-First pour assets hashés
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith('/assets/') || PRECACHE_URLS.includes(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
-        const fetchPromise = fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const clone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            }
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
-
-        return cachedResponse || fetchPromise;
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return networkResponse;
+        });
       })
     );
-    return;
   }
-
-  // 3. Fichiers statiques internes (JS, CSS, images locales) : Cache-First avec repli réseau
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(request).then((networkResponse) => {
-        if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          (url.pathname.startsWith('/assets/') || PRECACHE_URLS.includes(url.pathname))
-        ) {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return networkResponse;
-      });
-    })
-  );
 });

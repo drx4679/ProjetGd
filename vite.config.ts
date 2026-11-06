@@ -126,7 +126,7 @@ function gdSecurityPlugin(): Plugin {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     `img-src 'self' data: blob: ${SUPABASE} https://images.unsplash.com https://*.tile.openstreetmap.org https://wsrv.nl`,
-    `connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org https://cloudflareinsights.com https://*.cloudflareinsights.com`,
+    `connect-src 'self' ${SUPABASE} https://images.unsplash.com https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://cloudflareinsights.com https://*.cloudflareinsights.com`,
     "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",

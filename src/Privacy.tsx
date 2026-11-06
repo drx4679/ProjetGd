@@ -28,31 +28,31 @@ export default function Privacy({ onBack }: PrivacyProps) {
         </button>
       </div>
 
-      <div style={{ marginBottom: "32px", borderBottom: "1px solid #e2e8f0", paddingBottom: "24px" }}>
+      <div style={{ marginBottom: "32px", borderBottom: "1px solid var(--color-border-card, #e2e8f0)", paddingBottom: "24px" }}>
         <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--color-accent, #087fb5)", display: "block", marginBottom: "8px" }}>
           Transparence &amp; Protection des données
         </span>
-        <h1 style={{ fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.2 }}>
+        <h1 style={{ fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 800, color: "var(--color-ink-strong, #0f172a)", margin: 0, lineHeight: 1.2 }}>
           Politique de <span style={{ color: "var(--color-accent, #087fb5)" }}>Confidentialité</span>
         </h1>
-        <p style={{ fontSize: "13px", color: "#64748b", margin: "8px 0 0" }}>
+        <p style={{ fontSize: "13px", color: "var(--color-ink-subtle, #64748b)", margin: "8px 0 0" }}>
           Dernière mise à jour : 31 Octobre 2026 · Conforme aux exigences de protection des données personnelles au Togo (Loi n° 2019-014)
         </p>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "28px", color: "#334155", fontSize: "14.5px", lineHeight: "1.75" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "28px", color: "var(--color-ink, #334155)", fontSize: "14.5px", lineHeight: "1.75" }}>
         
         {/* Introduction */}
-        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px 24px" }}>
-          <p style={{ margin: 0, fontWeight: 500, color: "#1e293b" }}>
+        <div style={{ background: "var(--color-surface-card, #f8fafc)", border: "1px solid var(--color-border-card, #e2e8f0)", borderRadius: "14px", padding: "20px 24px" }}>
+          <p style={{ margin: 0, fontWeight: 500, color: "var(--color-ink-strong, #1e293b)" }}>
             Chez <strong>GoodDoctor's Shop</strong> (Lomé, Togo), nous accordons une importance capitale à la confidentialité et à la sécurité de vos données personnelles. En tant que plateforme de référence dédiée aux professionnels de santé et soignants, nous traitons vos informations avec la plus grande rigueur éthique et technologique.
           </p>
         </div>
 
         {/* Article 1 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>1</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>1</span>
             Données collectées
           </h2>
           <p>
@@ -68,8 +68,8 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 2 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>2</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>2</span>
             Finalités du traitement
           </h2>
           <p>Vos informations sont traitées exclusivement pour les finalités suivantes :</p>
@@ -84,8 +84,8 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 3 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>3</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>3</span>
             Sécurité des paiements &amp; Protection des données
           </h2>
           <p>
@@ -101,8 +101,8 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 4 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>4</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>4</span>
             Non-divulgation &amp; Non-vente des données
           </h2>
           <p>
@@ -112,8 +112,8 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 5 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>5</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>5</span>
             Cookies &amp; Stockage local
           </h2>
           <p>
@@ -127,8 +127,8 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 6 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>6</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>6</span>
             Vos droits &amp; Durée de conservation
           </h2>
           <p>
@@ -146,12 +146,12 @@ export default function Privacy({ onBack }: PrivacyProps) {
 
         {/* Article 7 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "#e0f2fe", color: "#0369a1", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>7</span>
+          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>7</span>
             Contact &amp; Responsable du traitement
           </h2>
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "18px 20px", marginTop: "10px" }}>
-            <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>GoodDoctor's Shop · Service Protection des Données</p>
+          <div style={{ background: "var(--color-surface-card, #f8fafc)", border: "1px solid var(--color-border-card, #e2e8f0)", borderRadius: "12px", padding: "18px 20px", marginTop: "10px" }}>
+            <p style={{ margin: 0, fontWeight: 600, color: "var(--color-ink-strong, #0f172a)" }}>GoodDoctor's Shop · Service Protection des Données</p>
             <p style={{ margin: "4px 0 0", color: "#475569" }}>Lomé, République Togolaise</p>
             <p style={{ margin: "4px 0 0", color: "#475569" }}>
               E-mail de contact :{" "}
@@ -162,7 +162,7 @@ export default function Privacy({ onBack }: PrivacyProps) {
           </div>
         </div>
 
-        <div style={{ marginTop: "32px", paddingTop: "24px", borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
+        <div style={{ marginTop: "32px", paddingTop: "24px", borderTop: "1px solid var(--color-border-card, #e2e8f0)", textAlign: "center" }}>
           <button
             type="button"
             onClick={handleBack}
