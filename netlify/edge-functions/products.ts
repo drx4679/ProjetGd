@@ -181,8 +181,242 @@ async function callRpc(url: string, key: string, fn: string): Promise<unknown[]>
   return Array.isArray(data) ? data : []
 }
 
-function sanitizeCatalog2Item(item: any) {
+type DirectVariantsMap = {
+  modelsByArticle: Map<number, any[]>
+  colorsByArticle: Map<number, any[]>
+  sizesByArticle: Map<number, any[]>
+}
+
+async function fetchVariantAvailabilityState(
+  url: string,
+  key: string
+): Promise<{ hiddenSet: Set<string>; direct: DirectVariantsMap }> {
+  const hiddenSet = new Set<string>()
+  const direct: DirectVariantsMap = {
+    modelsByArticle: new Map(),
+    colorsByArticle: new Map(),
+    sizesByArticle: new Map(),
+  }
+
+  const baseHeaders = { apikey: key, Authorization: `Bearer ${key}` }
+  const c2Headers = { ...baseHeaders, "Accept-Profile": "catalog2" }
+
+  const fetchJson = async (fullUrl: string, headers: Record<string, string>): Promise<any[]> => {
+    try {
+      const r = await fetch(fullUrl, { headers, signal: AbortSignal.timeout(6000) })
+      if (!r.ok) return []
+      const d = await r.json()
+      return Array.isArray(d) ? d : []
+    } catch {
+      return []
+    }
+  }
+
+  const [
+    settingsRows,
+    unpubModels,
+    unpubColors,
+    unpubSizes,
+    artModels,
+    artColors,
+    artSizes,
+  ] = await Promise.all([
+    fetchJson(`${url}/rest/v1/site_settings?setting_key=eq.hidden_variants_catalog2&select=setting_value`, baseHeaders),
+    fetchJson(`${url}/rest/v1/models?is_published=eq.false&select=id`, c2Headers),
+    fetchJson(`${url}/rest/v1/model_colors?is_published=eq.false&select=id`, c2Headers),
+    fetchJson(`${url}/rest/v1/color_sizes?is_published=eq.false&select=id`, c2Headers),
+    fetchJson(`${url}/rest/v1/article_models?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
+    fetchJson(`${url}/rest/v1/article_colors?deleted_at=is.null&select=id,article_id,name,hex,sale_price,is_published`, c2Headers),
+    fetchJson(`${url}/rest/v1/article_sizes?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
+  ])
+
+  for (const row of settingsRows) {
+    try {
+      const raw = typeof row?.setting_value === "string" ? JSON.parse(row.setting_value) : row?.setting_value
+      if (Array.isArray(raw)) {
+        for (const entry of raw) {
+          if (typeof entry === "string" && entry.trim()) {
+            hiddenSet.add(entry.trim().toLowerCase())
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed JSON in site_settings
+    }
+  }
+
+  for (const r of unpubModels) {
+    if (r?.id != null) hiddenSet.add(`model:${r.id}`)
+  }
+  for (const r of unpubColors) {
+    if (r?.id != null) hiddenSet.add(`color:${r.id}`)
+  }
+  for (const r of unpubSizes) {
+    if (r?.id != null) hiddenSet.add(`size:${r.id}`)
+  }
+
+  for (const r of artModels) {
+    if (r?.id == null) continue
+    if (r.is_published === false || hiddenSet.has(`article_model:${r.id}`)) {
+      hiddenSet.add(`article_model:${r.id}`)
+      continue
+    }
+    const aid = Number(r.article_id)
+    if (Number.isFinite(aid)) {
+      const list = direct.modelsByArticle.get(aid) || []
+      list.push(r)
+      direct.modelsByArticle.set(aid, list)
+    }
+  }
+
+  for (const r of artColors) {
+    if (r?.id == null) continue
+    if (r.is_published === false || hiddenSet.has(`article_color:${r.id}`)) {
+      hiddenSet.add(`article_color:${r.id}`)
+      continue
+    }
+    const aid = Number(r.article_id)
+    if (Number.isFinite(aid)) {
+      const list = direct.colorsByArticle.get(aid) || []
+      list.push(r)
+      direct.colorsByArticle.set(aid, list)
+    }
+  }
+
+  for (const r of artSizes) {
+    if (r?.id == null) continue
+    if (r.is_published === false || hiddenSet.has(`article_size:${r.id}`)) {
+      hiddenSet.add(`article_size:${r.id}`)
+      continue
+    }
+    const aid = Number(r.article_id)
+    if (Number.isFinite(aid)) {
+      const list = direct.sizesByArticle.get(aid) || []
+      list.push(r)
+      direct.sizesByArticle.set(aid, list)
+    }
+  }
+
+  return { hiddenSet, direct }
+}
+
+function sanitizeCatalog2Item(item: any, hiddenSet: Set<string>, direct: DirectVariantsMap) {
   if (!item || typeof item !== "object") return null
+  const articleId = Number(item._original_id || item.id)
+
+  const rawModels = Array.isArray(item.models) ? item.models : []
+  const filteredModels: any[] = []
+
+  for (const m of rawModels) {
+    if (!m || typeof m !== "object") continue
+    if (m.is_published === false) continue
+    if (m.id != null && (hiddenSet.has(`model:${m.id}`) || hiddenSet.has(`article_model:${m.id}`))) {
+      continue
+    }
+
+    const rawColors = Array.isArray(m.colors) ? m.colors : []
+    const filteredColors: any[] = []
+
+    for (const c of rawColors) {
+      if (!c || typeof c !== "object") continue
+      if (c.is_published === false) continue
+      if (c.id != null && (hiddenSet.has(`color:${c.id}`) || hiddenSet.has(`article_color:${c.id}`))) {
+        continue
+      }
+
+      const rawSizes = Array.isArray(c.sizes) ? c.sizes : []
+      const filteredSizes = rawSizes
+        .filter((s: any) => {
+          if (!s || typeof s !== "object") return false
+          if (s.is_published === false) return false
+          if (s.id != null && (hiddenSet.has(`size:${s.id}`) || hiddenSet.has(`article_size:${s.id}`))) {
+            return false
+          }
+          return true
+        })
+        .map((s: any) => ({
+          id: s.id ?? null,
+          name: s?.name || "",
+          sale_price: s?.sale_price ?? null,
+          is_published: true,
+        }))
+
+      // Si cette couleur possédait des tailles mais qu'elles ont toutes été retirées de la boutique, retirer la couleur
+      if (rawSizes.length > 0 && filteredSizes.length === 0) {
+        continue
+      }
+
+      filteredColors.push({
+        id: c.id ?? null,
+        name: c?.name || "",
+        sale_price: c?.sale_price ?? null,
+        is_published: true,
+        sizes: filteredSizes,
+      })
+    }
+
+    // Si ce modèle possédait des couleurs mais qu'elles ont toutes été retirées de la boutique, retirer le modèle
+    if (rawColors.length > 0 && filteredColors.length === 0) {
+      continue
+    }
+
+    filteredModels.push({
+      id: m.id ?? null,
+      name: m?.name || "",
+      sale_price: m?.sale_price ?? null,
+      is_published: true,
+      colors: filteredColors,
+    })
+  }
+
+  // Prise en charge des variantes directes (article_models, article_colors, article_sizes) si l'article n'a pas de hiérarchie models
+  if (rawModels.length === 0 && Number.isFinite(articleId)) {
+    const dModels = direct.modelsByArticle.get(articleId) || []
+    const dColors = direct.colorsByArticle.get(articleId) || []
+    const dSizes = direct.sizesByArticle.get(articleId) || []
+
+    if (dModels.length > 0 || dColors.length > 0 || dSizes.length > 0) {
+      const mappedSizes = dSizes.map((s: any) => ({
+        id: s.id,
+        name: s.name || "",
+        sale_price: s.sale_price ?? null,
+        is_published: true,
+      }))
+      const mappedColors =
+        dColors.length > 0
+          ? dColors.map((c: any) => ({
+              id: c.id,
+              name: c.name || "",
+              sale_price: c.sale_price ?? null,
+              is_published: true,
+              sizes: mappedSizes,
+            }))
+          : mappedSizes.length > 0
+          ? [{ id: null, name: "Standard", sale_price: null, is_published: true, sizes: mappedSizes }]
+          : []
+
+      if (dModels.length > 0) {
+        for (const dm of dModels) {
+          filteredModels.push({
+            id: dm.id,
+            name: dm.name || "",
+            sale_price: dm.sale_price ?? null,
+            is_published: true,
+            colors: mappedColors,
+          })
+        }
+      } else if (mappedColors.length > 0) {
+        filteredModels.push({
+          id: null,
+          name: "Standard",
+          sale_price: null,
+          is_published: true,
+          colors: mappedColors,
+        })
+      }
+    }
+  }
+
   return {
     id: item._original_id || item.id,
     name: item.name || "",
@@ -195,24 +429,7 @@ function sanitizeCatalog2Item(item: any) {
     promotion_value: item.promotion_value || 0,
     image_url: item.image_url || "",
     images: Array.isArray(item.images) ? item.images : [],
-    models: Array.isArray(item.models)
-      ? item.models.map((m: any) => ({
-          name: m?.name || "",
-          sale_price: m?.sale_price ?? null,
-          colors: Array.isArray(m?.colors)
-            ? m.colors.map((c: any) => ({
-                name: c?.name || "",
-                sale_price: c?.sale_price ?? null,
-                sizes: Array.isArray(c?.sizes)
-                  ? c.sizes.map((s: any) => ({
-                      name: s?.name || "",
-                      sale_price: s?.sale_price ?? null,
-                    }))
-                  : [],
-              }))
-            : [],
-        }))
-      : [],
+    models: filteredModels,
   }
 }
 
@@ -274,17 +491,20 @@ export default async (req: Request, context: Context) => {
   try {
     let payload = cachedCatalogPayload
     if (!payload || Date.now() >= cachedCatalogExpiresAt) {
-      const [rawCatalog2, rawPublicProducts] = await Promise.all([
+      const [rawCatalog2, rawPublicProducts, availabilityState] = await Promise.all([
         callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
         callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
+        fetchVariantAvailabilityState(supabaseUrl, supabaseKey),
       ])
 
-      const catalog2 = rawCatalog2.map(sanitizeCatalog2Item).filter(Boolean)
+      const catalog2 = rawCatalog2
+        .map((item) => sanitizeCatalog2Item(item, availabilityState.hiddenSet, availabilityState.direct))
+        .filter(Boolean)
       const publicProducts = rawPublicProducts.map(sanitizePublicItem).filter(Boolean)
       payload = { catalog2, publicProducts }
       if (catalog2.length > 0 || publicProducts.length > 0) {
         cachedCatalogPayload = payload
-        cachedCatalogExpiresAt = Date.now() + 60_000
+        cachedCatalogExpiresAt = Date.now() + 10_000
       }
     }
 

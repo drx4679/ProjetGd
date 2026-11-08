@@ -8,7 +8,7 @@ import ModalShell from './ModalShell'
 const Checkout = lazy(() => import('./Checkout').then(m => ({ default: m.default })))
 import type { PendingPaymentInfo } from './Checkout'
 import { formatMoney, formatPriceRange } from './money'
-import { useProducts, resolveVariantPrice, type Product } from './useProducts'
+import { useProducts, resolveVariantPrice, getAvailableSizesForColor, type Product } from './useProducts'
 // MedicalNeuralCanvas retiré du rendu (display: none partout) — conservé dans le repo pour réactivation future
 
 const photos = {
@@ -581,12 +581,13 @@ export default function App() {
   }, [lightbox])
 
   const addToCart = (product: Product) => {
-    const sizes = product.sizesList
     const colors = product.colorsList
+    const defaultColor = colors[0] || 'Standard'
+    const sizes = getAvailableSizesForColor(product, defaultColor)
     setCart(items => [...items, {
       productId: product.id,
       size: sizes.includes('M') ? 'M' : sizes[0] || 'Unique',
-      color: colors[0] || 'Standard',
+      color: defaultColor,
       quantity: 1,
       confirmed: false,
     }])
@@ -599,6 +600,10 @@ export default function App() {
       const p = products.find(p => p.id === item.productId)
       if (!p) return item
       const next = { ...item, confirmed: false, ...changes, productId: item.productId }
+      const allowedSizes = getAvailableSizesForColor(p, next.color)
+      if (allowedSizes.length > 0 && !allowedSizes.includes(next.size)) {
+        next.size = allowedSizes.includes('M') ? 'M' : allowedSizes[0]
+      }
       if (!Number.isInteger(next.quantity) || next.quantity < 1 || next.quantity > 99) return item
       return next
     }))
@@ -1511,12 +1516,26 @@ export default function App() {
 
           <p className="detail-description">{detailProduct.description}</p>
 
-          {(detailProduct.colorsList.length > 0 || detailProduct.sizesList.length > 0) && (
-            <div className="detail-variants">
-              {detailProduct.colorsList.length > 0 && <div><b>Coloris :</b> {detailProduct.colorsList.join(', ')}</div>}
-              {detailProduct.sizesList.length > 0 && <div><b>Tailles :</b> {detailProduct.sizesList.join(', ')}</div>}
-            </div>
-          )}
+          {(detailProduct.colorsList.length > 0 || detailProduct.sizesList.length > 0) && (() => {
+            const byColor = detailProduct.sizesByColor
+            const colorEntries = byColor ? Object.entries(byColor) : []
+            const hasPerColorDiff =
+              colorEntries.length > 1 &&
+              colorEntries.some(([, sz]) => sz.join('|') !== colorEntries[0][1].join('|'))
+            return (
+              <div className="detail-variants">
+                {detailProduct.colorsList.length > 0 && <div><b>Coloris :</b> {detailProduct.colorsList.join(', ')}</div>}
+                {detailProduct.sizesList.length > 0 && (
+                  <div>
+                    <b>Tailles :</b>{' '}
+                    {hasPerColorDiff
+                      ? colorEntries.map(([col, sz]) => `${col} (${sz.join(', ')})`).join(' · ')
+                      : detailProduct.sizesList.join(', ')}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <div className="detail-actions-bottom">
             <button
@@ -1671,6 +1690,7 @@ export default function App() {
               const p = products.find(p => p.id === item.productId)
               if (!p) return null
               const unitPrice = resolveVariantPrice(p, item.size, item.color)
+              const availableSizes = getAvailableSizesForColor(p, item.color)
               return (
                 <div className="cart-item" key={i}>
                   <img src={p.images[0]?.url || placeholder} alt={p.name} loading="lazy" decoding="async" />
@@ -1687,7 +1707,7 @@ export default function App() {
                           value={item.size}
                           onChange={e => updateCartItem(i, { size: e.target.value })}
                         >
-                          {(p.sizesList.length > 0 ? p.sizesList : ['Unique']).map(size => (
+                          {(availableSizes.length > 0 ? availableSizes : ['Unique']).map(size => (
                             <option key={size}>{size}</option>
                           ))}
                         </select>

@@ -7,6 +7,7 @@ export type Product = {
   price: number
   maxPrice?: number | null
   variantPrices?: Record<string, number>
+  sizesByColor?: Record<string, string[]>
   originalPrice: number | null
   promoBadge: string | null
   category: string
@@ -17,6 +18,18 @@ export type Product = {
   variantSizes: string | null
   sizesList: string[]
   colorsList: string[]
+}
+
+export function getAvailableSizesForColor(product: Product, color?: string): string[] {
+  if (color && product.sizesByColor) {
+    const trimmed = color.trim()
+    if (product.sizesByColor[trimmed]?.length) return product.sizesByColor[trimmed]
+    const matchKey = Object.keys(product.sizesByColor).find(
+      k => k.toLowerCase() === trimmed.toLowerCase()
+    )
+    if (matchKey && product.sizesByColor[matchKey]?.length) return product.sizesByColor[matchKey]
+  }
+  return product.sizesList
 }
 
 export function resolveVariantPrice(product: Product, size?: string, color?: string): number {
@@ -78,6 +91,7 @@ function transformCatalog2Product(item: any): Product {
   let price = item.price || 0
   let maxPrice: number | null = null
   const variantPrices: Record<string, number> = {}
+  const sizesByColor: Record<string, string[]> = {}
 
   const applyPromo = (p: number): number => {
     if (item.promotion_type && item.promotion_value > 0 && p > 0) {
@@ -90,9 +104,30 @@ function transformCatalog2Product(item: any): Product {
     return p
   }
 
-  if (!price && item.models?.length) {
+  // Filtrer les variantes retirées de la boutique (is_published === false) avec cascade
+  const publishedModels = Array.isArray(item.models)
+    ? item.models
+        .filter((m: any) => m && m.is_published !== false)
+        .map((m: any) => {
+          const rawColors = Array.isArray(m.colors) ? m.colors : []
+          const pubColors = rawColors
+            .filter((c: any) => c && c.is_published !== false)
+            .map((c: any) => {
+              const rawSizes = Array.isArray(c.sizes) ? c.sizes : []
+              const pubSizes = rawSizes.filter((s: any) => s && s.is_published !== false)
+              if (rawSizes.length > 0 && pubSizes.length === 0) return null
+              return { ...c, sizes: pubSizes }
+            })
+            .filter(Boolean)
+          if (rawColors.length > 0 && pubColors.length === 0) return null
+          return { ...m, colors: pubColors }
+        })
+        .filter(Boolean)
+    : []
+
+  if (!price && publishedModels.length) {
     const collectedPrices: number[] = []
-    for (const m of item.models) {
+    for (const m of publishedModels) {
       const mName = typeof m?.name === 'string' ? m.name.trim().toUpperCase() : ''
       const mPrice = m?.sale_price > 0 ? applyPromo(Number(m.sale_price)) : 0
       if (mPrice > 0) {
@@ -157,23 +192,37 @@ function transformCatalog2Product(item: any): Product {
   const name = item.name || 'Article sans nom'
   const category = inferCategory(name, item.category)
 
+  for (const m of publishedModels) {
+    for (const c of m?.colors || []) {
+      const cName = typeof c?.name === 'string' ? c.name.trim() : ''
+      if (!cName || cName.toLowerCase() === 'standard') continue
+      const cSizes = (c.sizes || [])
+        .map((s: any) => (typeof s?.name === 'string' ? s.name.trim() : ''))
+        .filter(Boolean) as string[]
+      if (cSizes.length > 0) {
+        const prev = sizesByColor[cName] || []
+        sizesByColor[cName] = Array.from(new Set([...prev, ...cSizes]))
+      }
+    }
+  }
+
   const modelColors = Array.from(
     new Set(
-      (item.models || [])
+      publishedModels
         .flatMap((m: any) => (m.colors || []).map((c: any) => c.name))
         .filter(Boolean) as string[]
     )
   )
   const colorSizes = Array.from(
     new Set(
-      (item.models || [])
+      publishedModels
         .flatMap((m: any) => (m.colors || []).flatMap((c: any) => (c.sizes || []).map((s: any) => s.name)))
         .filter(Boolean) as string[]
     )
   )
   const nonStandardModels = Array.from(
     new Set(
-      (item.models || [])
+      publishedModels
         .map((m: any) => (typeof m?.name === 'string' ? m.name.trim() : ''))
         .filter((n: string) => n && n.toLowerCase() !== 'standard' && n.toLowerCase() !== 'sans') as string[]
     )
@@ -187,6 +236,7 @@ function transformCatalog2Product(item: any): Product {
     price,
     maxPrice,
     variantPrices: Object.keys(variantPrices).length > 0 ? variantPrices : undefined,
+    sizesByColor: Object.keys(sizesByColor).length > 0 ? sizesByColor : undefined,
     originalPrice,
     promoBadge,
     category,
@@ -248,7 +298,7 @@ function transformPublicProduct(item: any): Product {
   })
 }
 
-const CACHE_KEY = 'gds_products_cache_v4'
+const CACHE_KEY = 'gds_products_cache_v5'
 
 function getInitialCache(): { products: Product[]; categories: string[]; ageMs: number } | null {
   try {
@@ -266,6 +316,7 @@ function getInitialCache(): { products: Product[]; categories: string[]; ageMs: 
           price: Math.round(Number(p.price)),
           maxPrice: Number.isFinite(Number(p.maxPrice)) && Number(p.maxPrice) > Number(p.price) ? Math.round(Number(p.maxPrice)) : null,
           variantPrices: p.variantPrices && typeof p.variantPrices === 'object' ? p.variantPrices : undefined,
+          sizesByColor: p.sizesByColor && typeof p.sizesByColor === 'object' ? p.sizesByColor : undefined,
           images: Array.isArray(p.images)
             ? p.images.map(sanitizeImageUrl).filter((x: { url: string } | null): x is { url: string } => Boolean(x))
             : [],
