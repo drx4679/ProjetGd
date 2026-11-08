@@ -97,9 +97,38 @@ footer .logo.shop-logo {
 .cart-item .variant-confirmed { color: var(--color-ink); background: #eeeee5; border-color: var(--color-border); }
 .cart-item .variant-add { color: var(--color-accent); border-color: var(--color-accent); }
 .variant-summary { font-size: 10px; line-height: 1.5; color: var(--color-ink-subtle); }
-@media (min-width: 641px) and (max-width: 900px) {
-  .header .logo.shop-logo { font-size: 23px; }
-  .sticky-header .header nav { gap: 18px; font-size: 13px; }
+@media (min-width: 641px) and (max-width: 1024px) {
+  .sticky-header .header {
+    padding: 0 3%;
+    gap: clamp(8px, 1.4vw, 18px);
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .header .logo.shop-logo {
+    font-size: clamp(16px, 1.9vw, 21px);
+    margin-right: 0;
+    gap: 8px;
+  }
+  .header .header-logo,
+  .header .header-logo-img {
+    width: 32px;
+    height: 32px;
+  }
+  .sticky-header .header nav {
+    gap: clamp(8px, 1.3vw, 16px);
+    font-size: clamp(11.5px, 1.4vw, 13px);
+    min-width: 0;
+  }
+  .sticky-header .header nav button {
+    padding: 4px;
+  }
+  .sticky-header .header-actions {
+    gap: clamp(6px, 1.1vw, 14px);
+  }
+  .sticky-header .header-actions > button {
+    min-width: 32px;
+    height: 36px;
+  }
 }
 @media (max-width: 640px) {
   .header .logo.shop-logo,
