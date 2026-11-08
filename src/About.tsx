@@ -13,7 +13,7 @@ export default function About({ onBack }: AboutProps) {
   }
 
   return (
-    <section id="view-about" className="legal-view-container pt-32 lg:pt-40 pb-24 px-6 container mx-auto max-w-5xl flex-grow animate-fadeIn">
+    <section id="view-about" className="legal-view-container pb-24 px-6 container mx-auto max-w-5xl flex-grow animate-fadeIn">
       <div className="mb-8">
         <button
           type="button"

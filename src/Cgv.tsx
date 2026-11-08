@@ -14,7 +14,7 @@ export default function Cgv({ onBack }: CgvProps) {
 
   return (
     <section id="view-cgv" className="legal-view-container animate-fadeIn">
-      <div className="mb-8">
+      <div style={{ marginBottom: "16px" }}>
         <button
           type="button"
           onClick={handleBack}
@@ -28,37 +28,37 @@ export default function Cgv({ onBack }: CgvProps) {
         </button>
       </div>
 
-      <div style={{ marginBottom: "32px", borderBottom: "1px solid var(--color-border-card, #e2e8f0)", paddingBottom: "24px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--color-accent, #087fb5)", display: "block", marginBottom: "8px" }}>
+      <div className="legal-header-block">
+        <span className="legal-eyebrow">
           Cadre contractuel &amp; Engagements
         </span>
-        <h1 style={{ fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 800, color: "var(--color-ink-strong, #0f172a)", margin: 0, lineHeight: 1.2 }}>
+        <h1 className="legal-title">
           Conditions Générales de <span style={{ color: "var(--color-accent, #087fb5)" }}>Vente (CGV)</span>
         </h1>
-        <p style={{ fontSize: "13px", color: "var(--color-ink-subtle, #64748b)", margin: "8px 0 0" }}>
+        <p className="legal-subtitle">
           Applicables aux commandes en ligne sur gooddoctorshop.com · En vigueur au 31 Octobre 2026
         </p>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "28px", color: "var(--color-ink, #334155)", fontSize: "14.5px", lineHeight: "1.75" }}>
+      <div className="legal-content">
         
         {/* Encart Préambule */}
-        <div style={{ background: "var(--color-surface-card, #f8fafc)", border: "1px solid var(--color-border-card, #e2e8f0)", borderRadius: "14px", padding: "20px 24px" }}>
-          <p style={{ margin: 0, fontWeight: 500, color: "var(--color-ink-strong, #1e293b)" }}>
+        <div className="legal-card">
+          <p style={{ margin: 0, fontWeight: 500 }}>
             Les présentes Conditions Générales de Vente (ci-après <strong>« CGV »</strong>) régissent l'ensemble des transactions commerciales conclues sur la boutique en ligne <strong>gooddoctorshop.com</strong>, éditée par <strong>GoodDoctor's Shop</strong>, domiciliée à Lomé (République Togolaise). Toute validation de commande implique l'adhésion pleine, entière et sans réserve du client aux présentes dispositions.
           </p>
         </div>
 
         {/* Article 1 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>1</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">1</span>
             Produits &amp; Conformité médicale
           </h2>
           <p>
             GoodDoctor's Shop commercialise des équipements destinés en priorité aux professionnels de la santé, cliniques, laboratoires, étudiants en médecine et soignants :
           </p>
-          <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ul className="legal-list">
             <li><strong>Uniformes &amp; Blouses médicales (Scrubs) :</strong> Vêtements professionnels confectionnés dans des textiles respirants, durables et résistants aux lavages fréquents en milieu hospitalier.</li>
             <li><strong>Dispositifs de diagnostic &amp; Matériel médical :</strong> Stéthoscopes, tensiomètres, oxymètres, thermomètres, marteaux réflexes et instruments certifiés cliniquement.</li>
             <li><strong>Accessoires &amp; Consommables de soins :</strong> Sabots médicaux, montres pour soignants, ciseaux de premiers secours et petit matériel pratique.</li>
@@ -70,14 +70,14 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 2 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>2</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">2</span>
             Prix &amp; Devises
           </h2>
           <p>
             Tous les prix affichés sur le site sont exprimés en <strong>Francs CFA (XOF)</strong>.
           </p>
-          <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ul className="legal-list">
             <li>Les tarifs applicables sont ceux en vigueur au moment de la passation de votre commande sur le site.</li>
             <li>GoodDoctor's Shop se réserve le droit de modifier ses prix à tout moment en fonction des cours et des approvisionnements, sans effet rétroactif sur les commandes déjà confirmées.</li>
             <li><strong>Frais de transaction :</strong> Conformément aux barèmes des opérateurs de paiement mobile et bancaire (1,5 %), les frais de transaction technique sont calculés et affichés de manière parfaitement transparente avant toute confirmation d'achat.</li>
@@ -86,46 +86,46 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 3 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>3</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">3</span>
             Validation de commande &amp; Processus d'achat
           </h2>
           <p>La passation de commande s'effectue selon les étapes suivantes :</p>
-          <ol style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ol className="legal-list" style={{ listStyleType: "decimal" }}>
             <li><strong>Sélection des articles :</strong> Choix des modèles, tailles, coloris et quantités ajoutés au panier.</li>
             <li><strong>Renseignement de la livraison :</strong> Saisie du nom, du numéro de téléphone de contact et de l'adresse de livraison (avec géolocalisation GPS facultative sur carte pour le Grand Lomé).</li>
             <li><strong>Acceptation légale :</strong> Lecture et validation de la Politique de confidentialité et des présentes CGV via la case à cocher obligatoire.</li>
-            <li><strong>Règlement :</strong> Redirection sécurisée vers le portail de paiement officiel CashPay.</li>
+            <li><strong>Règlement sécurisé en ligne :</strong> Redirection vers le portail officiel de paiement CashPay.</li>
             <li><strong>Confirmation :</strong> Attribution immédiate d'une référence unique de commande (ex: <code>GDS-...</code>) permettant le suivi en direct.</li>
           </ol>
         </div>
 
         {/* Article 4 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>4</span>
-            Modalités de paiement sécurisé (CashPay)
+          <h2 className="legal-section-title">
+            <span className="legal-badge">4</span>
+            Modalités de paiement 100% sécurisé en ligne (CashPay)
           </h2>
           <p>
-            Le règlement s'effectue en ligne via la plateforme agréée <strong>CashPay</strong>. Plusieurs moyens de règlement sont mis à votre disposition :
+            Le règlement s'effectue <strong>exclusivement en ligne</strong> via la plateforme agréée <strong>CashPay</strong> avant expédition. Aucun paiement en espèces à la livraison n'est accepté. Plusieurs moyens de règlement immédiat sont mis à votre disposition :
           </p>
-          <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ul className="legal-list">
             <li><strong>Mobile Money Togo &amp; Sous-région :</strong> Mixx by Yas, Moov Money, Coris Money.</li>
             <li><strong>Cartes bancaires internationales :</strong> Visa et Mastercard.</li>
           </ul>
           <p style={{ marginTop: "8px" }}>
-            La commande n'est préparée et expédiée qu'après confirmation irrévocable du débit par l'opérateur de paiement.
+            La commande n'est préparée et expédiée qu'après confirmation irrévocable du débit par l'opérateur de paiement en ligne.
           </p>
         </div>
 
         {/* Article 5 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>5</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">5</span>
             Livraison &amp; Délais d'acheminement
           </h2>
           <p>GoodDoctor's Shop dessert le Grand Lomé, les villes de l'intérieur du Togo ainsi que la sous-région :</p>
-          <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ul className="legal-list">
             <li><strong>Zone directe - Grand Lomé (≤ 20 km) :</strong> Les frais de livraison sont calculés selon la distance routière (de 1 000 à 2 000 FCFA). Le délai habituel de livraison est de <strong>24 à 48 heures ouvrées</strong>.</li>
             <li><strong>Hors zone directe Lomé (&gt; 20 km) &amp; Intérieur du Togo :</strong> La livraison s'opère par dépôt en gare ou compagnie de transport routier. Les frais d'expédition sont définis au cas par cas lors du dépôt en accord avec le client.</li>
             <li><strong>Commandes internationales :</strong> Pour les pays frontaliers (Bénin, Ghana, etc.) et la diaspora, les conditions et coûts d'acheminement sont établis sur mesure par notre service logistique.</li>
@@ -134,8 +134,8 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 6 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>6</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">6</span>
             Réception du colis &amp; Réclamations
           </h2>
           <p>
@@ -148,14 +148,14 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 7 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>7</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">7</span>
             Hygiène médicale &amp; Conditions strictes de retour
           </h2>
           <p>
             En raison de la destination hospitalière et clinique de nos produits, et pour d'impérieuses <strong>raisons d'hygiène et de protection de la santé publique</strong> :
           </p>
-          <ul style={{ paddingLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <ul className="legal-list">
             <li>Les uniformes ou vêtements ayant été portés, lavés ou altérés ne peuvent faire l'objet d'aucun retour ni échange.</li>
             <li>Les dispositifs médicaux et instruments dont le scellé de garantie, l'emballage stérile ou la boîte d'origine a été ouvert ne sont ni repris ni échangés.</li>
             <li>Seuls les articles neufs, intacts dans leur emballage complet d'origine et signalés sous 48h (erreur de taille avant utilisation, défaut de fabrication avéré) pourront être acceptés pour échange après validation de notre équipe technique.</li>
@@ -164,8 +164,8 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 8 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>8</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">8</span>
             Garantie constructeur &amp; Service Après-Vente (SAV)
           </h2>
           <p>
@@ -175,8 +175,8 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 9 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>9</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">9</span>
             Responsabilité &amp; Droit applicable
           </h2>
           <p>
@@ -189,14 +189,14 @@ export default function Cgv({ onBack }: CgvProps) {
 
         {/* Article 10 */}
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-ink-strong, #0f172a)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ background: "var(--color-surface-light, #e0f2fe)", color: "var(--color-accent, #0369a1)", width: "28px", height: "28px", borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: "13px" }}>10</span>
+          <h2 className="legal-section-title">
+            <span className="legal-badge">10</span>
             Service Client &amp; Assistance
           </h2>
-          <div style={{ background: "var(--color-surface-card, #f8fafc)", border: "1px solid var(--color-border-card, #e2e8f0)", borderRadius: "12px", padding: "18px 20px", marginTop: "10px" }}>
-            <p style={{ margin: 0, fontWeight: 600, color: "var(--color-ink-strong, #0f172a)" }}>GoodDoctor's Shop · Service Clientèle</p>
-            <p style={{ margin: "4px 0 0", color: "#475569" }}>Lomé, République Togolaise</p>
-            <p style={{ margin: "4px 0 0", color: "#475569" }}>
+          <div className="legal-card" style={{ marginTop: "10px" }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>GoodDoctor's Shop · Service Clientèle</p>
+            <p style={{ margin: "4px 0 0" }}>Lomé, République Togolaise</p>
+            <p style={{ margin: "4px 0 0" }}>
               Assistance par e-mail :{" "}
               <a href="mailto:gooddoctorshops@gmail.com" style={{ color: "var(--color-accent, #087fb5)", fontWeight: 600, textDecoration: "underline" }}>
                 gooddoctorshops@gmail.com
@@ -205,7 +205,7 @@ export default function Cgv({ onBack }: CgvProps) {
           </div>
         </div>
 
-        <div style={{ marginTop: "32px", paddingTop: "24px", borderTop: "1px solid var(--color-border-card, #e2e8f0)", textAlign: "center" }}>
+        <div className="legal-bottom-action">
           <button
             type="button"
             onClick={handleBack}

@@ -48,12 +48,36 @@ function checkRateLimit(ip: string): boolean {
     return true
   }
   entry.count++
-  return entry.count <= 60
+  return entry.count <= 600
 }
 
-// Cache mémoire court du catalogue brut (3 s) ; l'état de disponibilité des variantes est toujours lu en temps réel
+// Catalogue brut maintenu en mémoire avec rafraîchissement non-bloquant (stale-while-revalidate)
+// pour éviter les 5 s de latence de get_catalog2_articles à chaque poll.
+// L'état de disponibilité des variantes (site_settings + is_published) est TOUJOURS lu en temps réel (0 ms de cache).
 let cachedRawRpc: { rawCatalog2: unknown[]; rawPublicProducts: unknown[] } | null = null
 let cachedRawRpcExpiresAt = 0
+let rpcRefreshInFlight: Promise<{ rawCatalog2: unknown[]; rawPublicProducts: unknown[] }> | null = null
+let cachedDirectVariants: DirectVariantsMap | null = null
+let cachedDirectExpiresAt = 0
+
+function triggerBackgroundRpcRefresh(supabaseUrl: string, supabaseKey: string) {
+  if (rpcRefreshInFlight) return rpcRefreshInFlight
+  rpcRefreshInFlight = Promise.all([
+    callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
+    callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
+  ])
+    .then(([rawCatalog2, rawPublicProducts]) => {
+      if (rawCatalog2.length > 0 || rawPublicProducts.length > 0) {
+        cachedRawRpc = { rawCatalog2, rawPublicProducts }
+        cachedRawRpcExpiresAt = Date.now() + 10_000
+      }
+      return cachedRawRpc || { rawCatalog2, rawPublicProducts }
+    })
+    .finally(() => {
+      rpcRefreshInFlight = null
+    })
+  return rpcRefreshInFlight
+}
 
 // Clé publique RSA-OAEP-256 de secours côté serveur (utilisée si quelqu'un ouvre /api/products
 // directement dans un onglet ou via curl sans en-tête X-Pub-Key : la réponse reste 100 % chiffrée en JWE)
@@ -188,6 +212,54 @@ type DirectVariantsMap = {
   sizesByArticle: Map<number, any[]>
 }
 
+function isVariantHidden(
+  hiddenSet: Set<string>,
+  articleId: number,
+  level: "model" | "color" | "size",
+  id: number | string | null | undefined
+): boolean {
+  if (id == null) return false
+  const sid = String(id).trim().toLowerCase()
+  if (!sid) return false
+
+  const prefixes =
+    level === "model"
+      ? ["model", "models", "article_model", "article_models", "model_only"]
+      : level === "color"
+      ? ["color", "colors", "model_color", "model_colors", "article_color", "article_colors", "color_only"]
+      : ["size", "sizes", "color_size", "color_sizes", "article_size", "article_sizes", "size_only", "model_size"]
+
+  for (const p of prefixes) {
+    if (
+      hiddenSet.has(`${p}:${sid}`) ||
+      hiddenSet.has(`${p}-${sid}`) ||
+      (Number.isFinite(articleId) &&
+        (hiddenSet.has(`${articleId}:${p}:${sid}`) ||
+          hiddenSet.has(`${articleId}-${p}-${sid}`) ||
+          hiddenSet.has(`article:${articleId}:${p}:${sid}`)))
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+async function fetchDirectVariantsIfNeeded(
+  url: string,
+  c2Headers: Record<string, string>,
+  fetchJson: (fullUrl: string, headers: Record<string, string>) => Promise<any[]>
+): Promise<{ artModels: any[]; artColors: any[]; artSizes: any[] }> {
+  const [artModels, artColors, artSizes] = await Promise.all([
+    fetchJson(`${url}/rest/v1/article_models?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
+    fetchJson(`${url}/rest/v1/article_colors?deleted_at=is.null&select=id,article_id,name,hex,sale_price,is_published`, c2Headers),
+    fetchJson(`${url}/rest/v1/article_sizes?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
+  ])
+  return { artModels, artColors, artSizes }
+}
+
+let cachedRawDirectRows: { artModels: any[]; artColors: any[]; artSizes: any[] } | null = null
+let directRefreshInFlight: Promise<void> | null = null
+
 async function fetchVariantAvailabilityState(
   url: string,
   key: string
@@ -204,7 +276,7 @@ async function fetchVariantAvailabilityState(
 
   const fetchJson = async (fullUrl: string, headers: Record<string, string>): Promise<any[]> => {
     try {
-      const r = await fetch(fullUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(6000) })
+      const r = await fetch(fullUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(5000) })
       if (!r.ok) return []
       const d = await r.json()
       return Array.isArray(d) ? d : []
@@ -213,22 +285,26 @@ async function fetchVariantAvailabilityState(
     }
   }
 
-  const [
-    settingsRows,
-    unpubModels,
-    unpubColors,
-    unpubSizes,
-    artModels,
-    artColors,
-    artSizes,
-  ] = await Promise.all([
+  // Rafraîchit les variantes directes en arrière-plan sans bloquer les polls temps réel
+  if (!cachedRawDirectRows) {
+    cachedRawDirectRows = await fetchDirectVariantsIfNeeded(url, c2Headers, fetchJson)
+    cachedDirectExpiresAt = Date.now() + 5_000
+  } else if (Date.now() >= cachedDirectExpiresAt && !directRefreshInFlight) {
+    directRefreshInFlight = fetchDirectVariantsIfNeeded(url, c2Headers, fetchJson)
+      .then((rows) => {
+        cachedRawDirectRows = rows
+        cachedDirectExpiresAt = Date.now() + 5_000
+      })
+      .finally(() => {
+        directRefreshInFlight = null
+      })
+  }
+
+  const [settingsRows, unpubModels, unpubColors, unpubSizes] = await Promise.all([
     fetchJson(`${url}/rest/v1/site_settings?setting_key=eq.hidden_variants_catalog2&select=setting_value`, baseHeaders),
     fetchJson(`${url}/rest/v1/models?is_published=eq.false&select=id`, c2Headers),
     fetchJson(`${url}/rest/v1/model_colors?is_published=eq.false&select=id`, c2Headers),
     fetchJson(`${url}/rest/v1/color_sizes?is_published=eq.false&select=id`, c2Headers),
-    fetchJson(`${url}/rest/v1/article_models?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
-    fetchJson(`${url}/rest/v1/article_colors?deleted_at=is.null&select=id,article_id,name,hex,sale_price,is_published`, c2Headers),
-    fetchJson(`${url}/rest/v1/article_sizes?deleted_at=is.null&select=id,article_id,name,sale_price,is_published`, c2Headers),
   ])
 
   for (const row of settingsRows) {
@@ -238,6 +314,24 @@ async function fetchVariantAvailabilityState(
         for (const entry of raw) {
           if (typeof entry === "string" && entry.trim()) {
             hiddenSet.add(entry.trim().toLowerCase())
+          } else if (entry && typeof entry === "object") {
+            const lvl = String(entry.level || entry.type || "").trim().toLowerCase()
+            const eid = entry.id ?? entry.variantId ?? entry.variant_id
+            if (lvl && eid != null) hiddenSet.add(`${lvl}:${String(eid).toLowerCase()}`)
+          }
+        }
+      } else if (raw && typeof raw === "object") {
+        for (const [k, v] of Object.entries(raw)) {
+          if (v === true || v === false) {
+            // Supporte un objet { "color:150": true } (hidden=true) ou { "color:150": false } (is_published=false)
+            hiddenSet.add(k.trim().toLowerCase())
+          } else if (Array.isArray(v)) {
+            for (const item of v) {
+              if (typeof item === "string" || typeof item === "number") {
+                hiddenSet.add(`${k.trim().toLowerCase()}:${String(item).toLowerCase()}`)
+                hiddenSet.add(String(item).trim().toLowerCase())
+              }
+            }
           }
         }
       }
@@ -256,13 +350,15 @@ async function fetchVariantAvailabilityState(
     if (r?.id != null) hiddenSet.add(`size:${r.id}`)
   }
 
+  const { artModels, artColors, artSizes } = cachedRawDirectRows || { artModels: [], artColors: [], artSizes: [] }
+
   for (const r of artModels) {
     if (r?.id == null) continue
-    if (r.is_published === false || hiddenSet.has(`article_model:${r.id}`)) {
+    const aid = Number(r.article_id)
+    if (r.is_published === false || isVariantHidden(hiddenSet, aid, "model", r.id)) {
       hiddenSet.add(`article_model:${r.id}`)
       continue
     }
-    const aid = Number(r.article_id)
     if (Number.isFinite(aid)) {
       const list = direct.modelsByArticle.get(aid) || []
       list.push(r)
@@ -272,11 +368,11 @@ async function fetchVariantAvailabilityState(
 
   for (const r of artColors) {
     if (r?.id == null) continue
-    if (r.is_published === false || hiddenSet.has(`article_color:${r.id}`)) {
+    const aid = Number(r.article_id)
+    if (r.is_published === false || isVariantHidden(hiddenSet, aid, "color", r.id)) {
       hiddenSet.add(`article_color:${r.id}`)
       continue
     }
-    const aid = Number(r.article_id)
     if (Number.isFinite(aid)) {
       const list = direct.colorsByArticle.get(aid) || []
       list.push(r)
@@ -286,11 +382,11 @@ async function fetchVariantAvailabilityState(
 
   for (const r of artSizes) {
     if (r?.id == null) continue
-    if (r.is_published === false || hiddenSet.has(`article_size:${r.id}`)) {
+    const aid = Number(r.article_id)
+    if (r.is_published === false || isVariantHidden(hiddenSet, aid, "size", r.id)) {
       hiddenSet.add(`article_size:${r.id}`)
       continue
     }
-    const aid = Number(r.article_id)
     if (Number.isFinite(aid)) {
       const list = direct.sizesByArticle.get(aid) || []
       list.push(r)
@@ -311,7 +407,7 @@ function sanitizeCatalog2Item(item: any, hiddenSet: Set<string>, direct: DirectV
   for (const m of rawModels) {
     if (!m || typeof m !== "object") continue
     if (m.is_published === false) continue
-    if (m.id != null && (hiddenSet.has(`model:${m.id}`) || hiddenSet.has(`article_model:${m.id}`))) {
+    if (isVariantHidden(hiddenSet, articleId, "model", m.id)) {
       continue
     }
 
@@ -321,7 +417,7 @@ function sanitizeCatalog2Item(item: any, hiddenSet: Set<string>, direct: DirectV
     for (const c of rawColors) {
       if (!c || typeof c !== "object") continue
       if (c.is_published === false) continue
-      if (c.id != null && (hiddenSet.has(`color:${c.id}`) || hiddenSet.has(`article_color:${c.id}`))) {
+      if (isVariantHidden(hiddenSet, articleId, "color", c.id)) {
         continue
       }
 
@@ -330,7 +426,7 @@ function sanitizeCatalog2Item(item: any, hiddenSet: Set<string>, direct: DirectV
         .filter((s: any) => {
           if (!s || typeof s !== "object") return false
           if (s.is_published === false) return false
-          if (s.id != null && (hiddenSet.has(`size:${s.id}`) || hiddenSet.has(`article_size:${s.id}`))) {
+          if (isVariantHidden(hiddenSet, articleId, "size", s.id)) {
             return false
           }
           return true
@@ -490,20 +586,15 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    const needRpcRefresh = !cachedRawRpc || Date.now() >= cachedRawRpcExpiresAt
+    // Si cachedRawRpc est déjà en mémoire mais expiré, on le rafraîchit en arrière-plan sans bloquer la requête (~5 s économisées)
+    if (cachedRawRpc && Date.now() >= cachedRawRpcExpiresAt) {
+      triggerBackgroundRpcRefresh(supabaseUrl, supabaseKey)
+    }
+
     const [rpcResult, availabilityState] = await Promise.all([
-      needRpcRefresh
-        ? Promise.all([
-            callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
-            callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
-          ]).then(([rawCatalog2, rawPublicProducts]) => {
-            if (rawCatalog2.length > 0 || rawPublicProducts.length > 0) {
-              cachedRawRpc = { rawCatalog2, rawPublicProducts }
-              cachedRawRpcExpiresAt = Date.now() + 3_000
-            }
-            return { rawCatalog2, rawPublicProducts }
-          })
-        : Promise.resolve(cachedRawRpc!),
+      cachedRawRpc
+        ? Promise.resolve(cachedRawRpc)
+        : triggerBackgroundRpcRefresh(supabaseUrl, supabaseKey),
       fetchVariantAvailabilityState(supabaseUrl, supabaseKey),
     ])
 

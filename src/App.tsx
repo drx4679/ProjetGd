@@ -1133,7 +1133,7 @@ export default function App() {
       </div> : <>
       <div className="product-grid" aria-live="polite">{(filter === 'Tout' || !filter ? shown : shown.slice(0, visibleCount)).map((p, idx) => <article className="product modern-card" key={p.id} data-product-name={p.name}>
         <div className="product-image"><ProductGallery images={p.images} name={p.name} onOpenLightbox={handleOpenLightbox} objectPosition={getProductObjectPosition(p.name)} priority={idx < 2}/>{p.promoBadge && <span className="badge promo-badge">{p.promoBadge}</span>}{!p.inStock && <span className="badge out-of-stock-badge">Rupture</span>}{p.isFeatured && p.inStock && !p.promoBadge && <span className="badge">NOTRE SÉLECTION</span>}<button className={'favorite ' + (favorites.includes(p.id) ? 'liked' : '')} aria-label={`Favori : ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={() => setFavorites(items => items.includes(p.id) ? items.filter(id => id !== p.id) : [...items, p.id])}><Icon name="heart" size={18}/></button></div>
-        <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatPriceRange(p.price, p.maxPrice)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsList.length > 0 && <span>{p.colorsList.length} coloris</span>}{p.sizesList.length > 0 && <span>{p.sizesList.length} tailles</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
+        <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatPriceRange(p.price, p.maxPrice)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsCount > 0 && <span>{p.colorsCount} coloris</span>}{p.sizesCount > 0 && <span>{p.sizesCount} {p.sizesCount > 1 ? 'tailles' : 'taille'}</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
       </article>)}</div>
       {filter && filter !== 'Tout' && visibleCount < shown.length && (
         <div className="load-more-container">
@@ -1169,7 +1169,7 @@ export default function App() {
             <div className="order-step-card">
               <span className="order-step-badge" aria-hidden="true">02</span>
               <h3>Validez votre panier</h3>
-              <p>Confirmez votre sélection en un instant. Réglez en toute sécurité via CashPay (Mixx by Yas, Moov Money) ou à la livraison.</p>
+              <p>Confirmez votre sélection en un instant. Réglez en toute sécurité et en ligne via CashPay (Mixx by Yas, Moov Money, Carte bancaire).</p>
             </div>
             <div className="order-step-card">
               <span className="order-step-badge" aria-hidden="true">03</span>
@@ -1548,7 +1548,7 @@ export default function App() {
 
           <p className="detail-description">{detailProduct.description}</p>
 
-          {(detailProduct.colorsList.length > 0 || detailProduct.sizesList.length > 0) && (() => {
+          {(detailProduct.colorsCount > 0 || detailProduct.sizesCount > 0) && (() => {
             const byColor = detailProduct.sizesByColor
             const colorEntries = byColor ? Object.entries(byColor) : []
             const hasPerColorDiff =
@@ -1556,10 +1556,14 @@ export default function App() {
               colorEntries.some(([, sz]) => sz.join('|') !== colorEntries[0][1].join('|'))
             return (
               <div className="detail-variants">
-                {detailProduct.colorsList.length > 0 && <div><b>Coloris :</b> {detailProduct.colorsList.join(', ')}</div>}
-                {detailProduct.sizesList.length > 0 && (
+                {detailProduct.colorsCount > 0 && (
                   <div>
-                    <b>Tailles :</b>{' '}
+                    <b>Coloris ({detailProduct.colorsCount}) :</b> {detailProduct.colorsList.join(', ')}
+                  </div>
+                )}
+                {detailProduct.sizesCount > 0 && (
+                  <div>
+                    <b>Tailles ({detailProduct.sizesCount}) :</b>{' '}
                     {hasPerColorDiff
                       ? colorEntries.map(([col, sz]) => `${col} (${sz.join(', ')})`).join(' · ')
                       : detailProduct.sizesList.join(', ')}
@@ -1731,7 +1735,7 @@ export default function App() {
                     <p>{formatMoney(unitPrice)} / pièce</p>
                     <div className="variant-fields">
                       <label htmlFor={`cart-size-${i}`}>
-                        Taille/Format
+                        Taille/Format{availableSizes.length > 0 ? ` (${availableSizes.length})` : ''}
                         <select
                           id={`cart-size-${i}`}
                           name={`cart_size_${i}`}
@@ -1745,7 +1749,7 @@ export default function App() {
                         </select>
                       </label>
                       <label htmlFor={`cart-color-${i}`}>
-                        Couleur
+                        Couleur{p.colorsList.length > 0 ? ` (${p.colorsList.length})` : ''}
                         <select
                           id={`cart-color-${i}`}
                           name={`cart_color_${i}`}

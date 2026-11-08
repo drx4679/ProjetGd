@@ -1,5 +1,5 @@
 // Service Worker — GoodDoctor's Shop (PWA & Offline Resilience)
-const CACHE_NAME = 'gooddoctor-cache-v2';
+const CACHE_NAME = 'gooddoctor-cache-v3';
 const PRECACHE_URLS = [
   '/',
   '/index.html',

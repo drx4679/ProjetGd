@@ -18,6 +18,8 @@ export type Product = {
   variantSizes: string | null
   sizesList: string[]
   colorsList: string[]
+  sizesCount: number
+  colorsCount: number
 }
 
 export function getAvailableSizesForColor(product: Product, color?: string): string[] {
@@ -77,14 +79,21 @@ function inferCategory(name: string, rawCategory: string | null | undefined): st
   return 'Général'
 }
 
-function enrichProduct(base: Omit<Product, 'sizesList' | 'colorsList'>): Product {
+function enrichProduct(
+  base: Omit<Product, 'sizesList' | 'colorsList' | 'sizesCount' | 'colorsCount'> & {
+    sizesCount?: number
+    colorsCount?: number
+  }
+): Product {
   let sizesList = base.variantSizes
     ? Array.from(new Set(base.variantSizes.split(', ').map(s => s.trim()).filter(Boolean)))
     : []
   let colorsList = base.variantColors
     ? Array.from(new Set(base.variantColors.split(', ').map(c => c.trim()).filter(c => c && c.toLowerCase() !== 'standard')))
     : []
-  return { ...base, sizesList, colorsList }
+  const sizesCount = typeof base.sizesCount === 'number' ? base.sizesCount : sizesList.length
+  const colorsCount = typeof base.colorsCount === 'number' ? base.colorsCount : colorsList.length
+  return { ...base, sizesList, colorsList, sizesCount, colorsCount }
 }
 
 function transformCatalog2Product(item: any): Product {
@@ -206,28 +215,24 @@ function transformCatalog2Product(item: any): Product {
     }
   }
 
-  const modelColors = Array.from(
-    new Set(
-      publishedModels
-        .flatMap((m: any) => (m.colors || []).map((c: any) => c.name))
-        .filter(Boolean) as string[]
-    )
-  )
-  const colorSizes = Array.from(
-    new Set(
-      publishedModels
-        .flatMap((m: any) => (m.colors || []).flatMap((c: any) => (c.sizes || []).map((s: any) => s.name)))
-        .filter(Boolean) as string[]
-    )
-  )
-  const nonStandardModels = Array.from(
-    new Set(
-      publishedModels
-        .map((m: any) => (typeof m?.name === 'string' ? m.name.trim() : ''))
-        .filter((n: string) => n && n.toLowerCase() !== 'standard' && n.toLowerCase() !== 'sans') as string[]
-    )
-  )
+  const allColorNames = publishedModels
+    .flatMap((m: any) => (m.colors || []).map((c: any) => (typeof c?.name === 'string' ? c.name.trim() : '')))
+    .filter((c: string) => c && c.toLowerCase() !== 'standard') as string[]
+
+  const allColorSizes = publishedModels
+    .flatMap((m: any) => (m.colors || []).flatMap((c: any) => (c.sizes || []).map((s: any) => (typeof s?.name === 'string' ? s.name.trim() : ''))))
+    .filter(Boolean) as string[]
+
+  const allNonStandardModels = publishedModels
+    .map((m: any) => (typeof m?.name === 'string' ? m.name.trim() : ''))
+    .filter((n: string) => n && n.toLowerCase() !== 'standard' && n.toLowerCase() !== 'sans') as string[]
+
+  const modelColors = Array.from(new Set(allColorNames))
+  const colorSizes = Array.from(new Set(allColorSizes))
+  const nonStandardModels = Array.from(new Set(allNonStandardModels))
   const combinedSizes = colorSizes.length > 0 ? colorSizes : nonStandardModels
+  const sizesCount = allColorSizes.length > 0 ? allColorSizes.length : allNonStandardModels.length
+  const colorsCount = allColorNames.length
 
   return enrichProduct({
     id: `C2-${item._original_id || item.id}`,
@@ -245,6 +250,8 @@ function transformCatalog2Product(item: any): Product {
     isFeatured: item.is_featured || false,
     variantColors: modelColors.join(', ') || null,
     variantSizes: combinedSizes.join(', ') || null,
+    sizesCount,
+    colorsCount,
   })
 }
 
@@ -298,7 +305,7 @@ function transformPublicProduct(item: any): Product {
   })
 }
 
-const CACHE_KEY = 'gds_products_cache_v6'
+const CACHE_KEY = 'gds_products_cache_v7'
 
 function getInitialCache(): { products: Product[]; categories: string[]; ageMs: number } | null {
   try {
@@ -309,20 +316,26 @@ function getInitialCache(): { products: Product[]; categories: string[]; ageMs: 
     if (Array.isArray(data) && data.length > 0 && ageMs < 60 * 60 * 1000) {
       const sanitized: Product[] = data
         .filter((p: any) => p && typeof p.id === 'string' && typeof p.name === 'string' && Number.isFinite(Number(p.price)) && Number(p.price) >= 0)
-        .map((p: any) => ({
-          ...p,
-          name: String(p.name).replace(/[<>]/g, '').slice(0, 200),
-          description: String(p.description || '').replace(/[<>]/g, '').slice(0, 1000),
-          price: Math.round(Number(p.price)),
-          maxPrice: Number.isFinite(Number(p.maxPrice)) && Number(p.maxPrice) > Number(p.price) ? Math.round(Number(p.maxPrice)) : null,
-          variantPrices: p.variantPrices && typeof p.variantPrices === 'object' ? p.variantPrices : undefined,
-          sizesByColor: p.sizesByColor && typeof p.sizesByColor === 'object' ? p.sizesByColor : undefined,
-          images: Array.isArray(p.images)
-            ? p.images.map(sanitizeImageUrl).filter((x: { url: string } | null): x is { url: string } => Boolean(x))
-            : [],
-          sizesList: Array.isArray(p.sizesList) ? p.sizesList.map((s: any) => String(s).slice(0, 40)) : [],
-          colorsList: Array.isArray(p.colorsList) ? p.colorsList.map((c: any) => String(c).slice(0, 40)) : [],
-        }))
+        .map((p: any) => {
+          const sizesList = Array.isArray(p.sizesList) ? p.sizesList.map((s: any) => String(s).slice(0, 40)) : []
+          const colorsList = Array.isArray(p.colorsList) ? p.colorsList.map((c: any) => String(c).slice(0, 40)) : []
+          return {
+            ...p,
+            name: String(p.name).replace(/[<>]/g, '').slice(0, 200),
+            description: String(p.description || '').replace(/[<>]/g, '').slice(0, 1000),
+            price: Math.round(Number(p.price)),
+            maxPrice: Number.isFinite(Number(p.maxPrice)) && Number(p.maxPrice) > Number(p.price) ? Math.round(Number(p.maxPrice)) : null,
+            variantPrices: p.variantPrices && typeof p.variantPrices === 'object' ? p.variantPrices : undefined,
+            sizesByColor: p.sizesByColor && typeof p.sizesByColor === 'object' ? p.sizesByColor : undefined,
+            images: Array.isArray(p.images)
+              ? p.images.map(sanitizeImageUrl).filter((x: { url: string } | null): x is { url: string } => Boolean(x))
+              : [],
+            sizesList,
+            colorsList,
+            sizesCount: Number.isFinite(Number(p.sizesCount)) ? Number(p.sizesCount) : sizesList.length,
+            colorsCount: Number.isFinite(Number(p.colorsCount)) ? Number(p.colorsCount) : colorsList.length,
+          }
+        })
       if (sanitized.length === 0) return null
       const cats = new Set(sanitized.map(p => p.category))
       return {
@@ -355,6 +368,7 @@ export function useProducts() {
     let cancelled = false
     let hasLiveProducts = false
     let inFlight = false
+    let pendingReload = false
     let lastSig = initialCache?.products ? JSON.stringify(initialCache.products) : ''
 
     const applyProducts = (merged: Product[], persist = true) => {
@@ -388,7 +402,11 @@ export function useProducts() {
     }
 
     async function loadFromApi() {
-      if (cancelled || inFlight) return
+      if (cancelled) return
+      if (inFlight) {
+        pendingReload = true
+        return
+      }
       inFlight = true
       try {
         let catalog2: any[] = []
@@ -417,10 +435,14 @@ export function useProducts() {
       } finally {
         inFlight = false
         if (!cancelled) setLoading(false)
+        if (!cancelled && pendingReload) {
+          pendingReload = false
+          loadFromApi()
+        }
       }
     }
 
-    // Rafraîchissement immédiat au chargement + au retour sur l'onglet + synchronisation temps réel (toutes les 3 s)
+    // Rafraîchissement immédiat au chargement + au retour sur l'onglet/survol + synchronisation temps réel (toutes les 1.2 s)
     loadFromApi()
 
     const onVisibilityOrFocus = () => {
@@ -432,18 +454,20 @@ export function useProducts() {
     window.addEventListener('focus', onVisibilityOrFocus)
     document.addEventListener('visibilitychange', onVisibilityOrFocus)
     window.addEventListener('online', onVisibilityOrFocus)
+    document.addEventListener('pointerenter', onVisibilityOrFocus)
 
     const pollInterval = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
         loadFromApi()
       }
-    }, 3000)
+    }, 1200)
 
     return () => {
       cancelled = true
       window.removeEventListener('focus', onVisibilityOrFocus)
       document.removeEventListener('visibilitychange', onVisibilityOrFocus)
       window.removeEventListener('online', onVisibilityOrFocus)
+      document.removeEventListener('pointerenter', onVisibilityOrFocus)
       window.clearInterval(pollInterval)
     }
   }, [initialCache])
