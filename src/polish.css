@@ -102,15 +102,32 @@
 }
 
 /* ═══ HERO PHOTO CLASSIQUE — tablette & PC (≥ 641px) — même style que mobile ═══ */
+.hero-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 @media (min-width: 641px) {
-  /* Photo produit sombre comme sur mobile - cadrage sur le visage */
+  .hero-picture {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  /* Cadrage buste naturel sans zoom excessif sur PC (photo verticale a.jpg) */
   .hero-photo {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width: auto;
+    height: 148%;
+    max-width: none;
+    margin-top: -24px;
+    margin-left: 18%;
+    object-fit: contain;
     object-position: center top;
-    filter: brightness(0.8);
+    filter: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 96.5%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 96.5%, transparent 100%);
   }
 
   /* Masquer le canvas neuronal animé */
@@ -119,15 +136,17 @@
   }
 
   .hero {
-    background: #626254;
+    background: linear-gradient(180deg, #8169c6 0%, #876fc4 48%, #5f4a9f 100%);
     border-bottom: none;
   }
 
   .hero-shade {
     background: linear-gradient(
       90deg,
-      rgba(20, 26, 17, 0.77),
-      rgba(20, 26, 17, 0.08) 80%
+      rgba(18, 15, 28, 0.78) 0%,
+      rgba(18, 15, 28, 0.42) 42%,
+      rgba(18, 15, 28, 0.18) 75%,
+      rgba(18, 15, 28, 0.22) 100%
     );
     pointer-events: none;
   }

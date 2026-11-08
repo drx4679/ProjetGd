@@ -27,7 +27,8 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" href="/logo.webp" as="image" type="image/webp" />
-    <link rel="preload" href="/IMG_8380.jpeg" as="image" type="image/jpeg" fetchpriority="high" />
+    <link rel="preload" href="/IMG_8380.jpeg" as="image" type="image/jpeg" media="(max-width: 640px)" fetchpriority="high" />
+    <link rel="preload" href="/a.jpg" as="image" type="image/jpeg" media="(min-width: 641px)" fetchpriority="high" />
 
     <!-- Métadonnées de partage de lien (WhatsApp, Facebook, LinkedIn, Twitter) -->
     <meta property="og:type" content="website" />

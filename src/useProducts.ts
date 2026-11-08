@@ -5,6 +5,8 @@ export type Product = {
   name: string
   description: string
   price: number
+  maxPrice?: number | null
+  variantPrices?: Record<string, number>
   originalPrice: number | null
   promoBadge: string | null
   category: string
@@ -15,6 +17,17 @@ export type Product = {
   variantSizes: string | null
   sizesList: string[]
   colorsList: string[]
+}
+
+export function resolveVariantPrice(product: Product, size?: string, color?: string): number {
+  const map = product.variantPrices
+  if (!map) return product.price
+  const s = (size || '').trim().toUpperCase()
+  const c = (color || '').trim().toUpperCase()
+  if (s && c && map[`${s}|${c}`] > 0) return map[`${s}|${c}`]
+  if (s && map[`S:${s}`] > 0) return map[`S:${s}`]
+  if (c && map[`C:${c}`] > 0) return map[`C:${c}`]
+  return product.price
 }
 
 function sanitizeImageUrl(raw: unknown): { url: string } | null {
@@ -63,25 +76,72 @@ function enrichProduct(base: Omit<Product, 'sizesList' | 'colorsList'>): Product
 
 function transformCatalog2Product(item: any): Product {
   let price = item.price || 0
+  let maxPrice: number | null = null
+  const variantPrices: Record<string, number> = {}
+
+  const applyPromo = (p: number): number => {
+    if (item.promotion_type && item.promotion_value > 0 && p > 0) {
+      if (item.promotion_type === 'percent') {
+        return Math.round(p * (1 - item.promotion_value / 100))
+      } else if (item.promotion_type === 'amount') {
+        return Math.max(0, p - item.promotion_value)
+      }
+    }
+    return p
+  }
+
   if (!price && item.models?.length) {
-    const m = item.models[0]
-    price = m.sale_price || 0
-    if (!price && m.colors?.length) {
-      const c = m.colors[0]
-      price = c.sale_price || 0
-      if (!price && c.sizes?.length) price = c.sizes[0].sale_price || 0
+    const collectedPrices: number[] = []
+    for (const m of item.models) {
+      const mName = typeof m?.name === 'string' ? m.name.trim().toUpperCase() : ''
+      const mPrice = m?.sale_price > 0 ? applyPromo(Number(m.sale_price)) : 0
+      if (mPrice > 0) {
+        collectedPrices.push(mPrice)
+        if (mName) variantPrices[`S:${mName}`] = mPrice
+      }
+      for (const c of m?.colors || []) {
+        const cName = typeof c?.name === 'string' ? c.name.trim().toUpperCase() : ''
+        const cPrice = c?.sale_price > 0 ? applyPromo(Number(c.sale_price)) : mPrice
+        if (c?.sale_price > 0) {
+          collectedPrices.push(cPrice)
+        }
+        if (cPrice > 0 && cName) {
+          variantPrices[`C:${cName}`] = cPrice
+          if (mName) variantPrices[`${mName}|${cName}`] = cPrice
+        }
+        for (const s of c?.sizes || []) {
+          const sName = typeof s?.name === 'string' ? s.name.trim().toUpperCase() : ''
+          const sPrice = s?.sale_price > 0 ? applyPromo(Number(s.sale_price)) : cPrice
+          if (s?.sale_price > 0) {
+            collectedPrices.push(sPrice)
+          }
+          if (sPrice > 0 && sName) {
+            variantPrices[`S:${sName}`] = sPrice
+            if (cName) variantPrices[`${sName}|${cName}`] = sPrice
+          }
+        }
+      }
+    }
+    if (collectedPrices.length > 0) {
+      const minP = Math.min(...collectedPrices)
+      const maxP = Math.max(...collectedPrices)
+      price = minP
+      if (maxP > minP) {
+        maxPrice = maxP
+      }
     }
   }
 
   let originalPrice: number | null = null
   let promoBadge: string | null = null
   if (item.promotion_type && item.promotion_value > 0 && price > 0) {
-    originalPrice = price
+    if (item.price > 0) {
+      originalPrice = item.price
+      price = applyPromo(item.price)
+    }
     if (item.promotion_type === 'percent') {
-      price = Math.round(price * (1 - item.promotion_value / 100))
       promoBadge = `-${item.promotion_value}%`
     } else if (item.promotion_type === 'amount') {
-      price = Math.max(0, price - item.promotion_value)
       promoBadge = `-${item.promotion_value} FCFA`
     }
   }
@@ -125,6 +185,8 @@ function transformCatalog2Product(item: any): Product {
     name,
     description: (item.description || '').replace(/<[^>]*>/g, '').trim() || name,
     price,
+    maxPrice,
+    variantPrices: Object.keys(variantPrices).length > 0 ? variantPrices : undefined,
     originalPrice,
     promoBadge,
     category,
@@ -186,7 +248,7 @@ function transformPublicProduct(item: any): Product {
   })
 }
 
-const CACHE_KEY = 'gds_products_cache_v2'
+const CACHE_KEY = 'gds_products_cache_v4'
 
 function getInitialCache(): { products: Product[]; categories: string[]; ageMs: number } | null {
   try {
@@ -202,6 +264,8 @@ function getInitialCache(): { products: Product[]; categories: string[]; ageMs: 
           name: String(p.name).replace(/[<>]/g, '').slice(0, 200),
           description: String(p.description || '').replace(/[<>]/g, '').slice(0, 1000),
           price: Math.round(Number(p.price)),
+          maxPrice: Number.isFinite(Number(p.maxPrice)) && Number(p.maxPrice) > Number(p.price) ? Math.round(Number(p.maxPrice)) : null,
+          variantPrices: p.variantPrices && typeof p.variantPrices === 'object' ? p.variantPrices : undefined,
           images: Array.isArray(p.images)
             ? p.images.map(sanitizeImageUrl).filter((x: { url: string } | null): x is { url: string } => Boolean(x))
             : [],

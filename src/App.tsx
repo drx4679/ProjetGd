@@ -7,12 +7,13 @@ const Cgv = lazy(() => import('./Cgv'))
 import ModalShell from './ModalShell'
 const Checkout = lazy(() => import('./Checkout').then(m => ({ default: m.default })))
 import type { PendingPaymentInfo } from './Checkout'
-import { formatMoney } from './money'
-import { useProducts, type Product } from './useProducts'
+import { formatMoney, formatPriceRange } from './money'
+import { useProducts, resolveVariantPrice, type Product } from './useProducts'
 // MedicalNeuralCanvas retiré du rendu (display: none partout) — conservé dans le repo pour réactivation future
 
 const photos = {
   hero: '/IMG_8380.jpeg',
+  heroDesktop: '/a.jpg',
 }
 
 const placeholder = '/no-image.svg'
@@ -186,12 +187,7 @@ export default function App() {
       clearTimeout(t2)
     }
   }, [currentView])
-  const [filter, setFilter] = useState(() => {
-    try { return sessionStorage.getItem('gd_active_filter') || 'Tout' } catch { return 'Tout' }
-  })
-  useEffect(() => {
-    try { sessionStorage.setItem('gd_active_filter', filter) } catch {}
-  }, [filter])
+  const [filter, setFilter] = useState('')
 
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
@@ -652,10 +648,10 @@ export default function App() {
   const [newsletterMessage, setNewsletterMessage] = useState<{ text: string; isError?: boolean } | null>(null)
   const [catalog, setCatalog] = useState(false)
   const [sort, setSort] = useState('featured')
-  const [visibleCount, setVisibleCount] = useState(5)
+  const [visibleCount, setVisibleCount] = useState(() => (!filter || filter === 'Tout' ? Infinity : 5))
 
   useEffect(() => {
-    setVisibleCount(5)
+    setVisibleCount(!filter || filter === 'Tout' ? Infinity : 5)
   }, [filter, deferredSearch, panel, sort, catalog])
 
   useEffect(() => {
@@ -707,7 +703,7 @@ export default function App() {
 
   const subtotal = cart.reduce((sum, item) => {
     const p = products.find(p => p.id === item.productId)
-    return sum + (p ? p.price * item.quantity : 0)
+    return sum + (p ? resolveVariantPrice(p, item.size, item.color) * item.quantity : 0)
   }, 0)
 
   const scrollToSelection = useCallback(() => {
@@ -758,7 +754,7 @@ export default function App() {
   const handleShare = useCallback((product: Product) => {
     const origin = window.location.origin
     const shareUrl = `${origin}/p/${encodeURIComponent(product.id)}`
-    const priceStr = product.price > 0 ? ` — ${formatMoney(product.price)}` : ''
+    const priceStr = product.price > 0 ? ` — ${formatPriceRange(product.price, product.maxPrice)}` : ''
     const shareText = `${product.name} — Certifié disponible sur GoodDoctor's Shop${priceStr}`
     const fullMessage = `${shareText}\n${shareUrl}`
 
@@ -788,7 +784,9 @@ export default function App() {
     return products
       .filter(p => p.price > 0)
       .filter(p => {
-        const matchesCat = filter === 'Tout' || p.category === filter
+        const matchesCat = !filter
+          ? (q || panel === 'favorites' ? true : p.isFeatured)
+          : filter === 'Tout' || p.category === filter
         const matchesQuery =
           !q ||
           normalize(p.name).includes(q) ||
@@ -823,7 +821,7 @@ export default function App() {
       )}
       <div className="announcement">LIVRAISON EXPRESS DISPONIBLE</div>
     <header className="header">
-      <a href="#" className="logo shop-logo" aria-label="GoodDoctor's Shop accueil" onClick={(e) => { e.preventDefault(); setFilter('Tout'); navigateToView('home'); }}>
+      <a href="#" className="logo shop-logo" aria-label="GoodDoctor's Shop accueil" onClick={(e) => { e.preventDefault(); setFilter(''); navigateToView('home'); }}>
         <img src="/logo.webp" alt="Logo GoodDoctor's Shop" className="header-logo" width="36" height="36" />
         GoodDoctor's <span className="shop-word">Shop</span>
       </a>
@@ -1020,7 +1018,10 @@ export default function App() {
       {currentView === 'cgv' && <Suspense fallback={null}><Cgv onBack={() => navigateToView('home')} /></Suspense>}
       <div hidden={currentView !== 'home'}>
       <section className="hero">
-        <img className="hero-photo" src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" fetchPriority="high" />
+        <picture className="hero-picture">
+          <source media="(min-width: 641px)" srcSet={photos.heroDesktop} />
+          <img className="hero-photo" src={photos.hero} alt="Équipements et matériel médical GoodDoctor's Shop" fetchPriority="high" />
+        </picture>
         {/* MedicalNeuralCanvas: masqué par CSS à toutes les tailles, rendu conditionnel supprimé pour perf */}
         <div className="hero-shade"/>
         <div className="hero-content"><h1>L'empreinte<br/>de la Qualité.</h1><p>Uniformes, dispositifs et accessoires médicaux.<br/>Pour tous les professionnels de santé.</p><div className="hero-cta"><button className="primary" onClick={() => go()}>Découvrir le catalogue <Icon name="arrow"/></button><a className="tracking-link" href="#suivi-commande" onClick={(e) => { e.preventDefault(); setPanel(''); setDetailProduct(null); navigateToView('tracking'); }}><Icon name="truck" size={19}/>Suivre ma commande</a></div></div>
@@ -1081,7 +1082,7 @@ export default function App() {
           ))}
         </div>
       </section>
-      <section className="section selection" id="selection"><div className="section-title"><div><h2>{panel === 'favorites' ? 'Vos équipements favoris.' : catalog ? 'Notre catalogue médical.' : 'Notre sélection pour les soignants.'}</h2></div><button className="text-link" onClick={() => { setPanel(''); setFilter('Tout'); setSearch(''); setCatalog(true) }}>Voir tout le catalogue <Icon name="arrow" size={18}/></button></div><div className="filters" role="tablist" aria-label="Filtrer par catégorie">{filterCategories.map(f => <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div>{catalog && <div className="catalog-toolbar"><label htmlFor="catalog-sort-select">Trier par <select id="catalog-sort-select" name="catalog_sort" value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Notre sélection</option><option value="ascending">Prix croissant</option><option value="descending">Prix décroissant</option></select></label><button onClick={() => { setFilter('Tout'); setSearch(''); setSort('featured') }}>Réinitialiser les filtres</button></div>}
+      <section className="section selection" id="selection"><div className="section-title"><div><h2>{panel === 'favorites' ? 'Vos équipements favoris.' : catalog ? 'Notre catalogue médical.' : 'Notre sélection pour les soignants.'}</h2></div><button className="text-link" onClick={() => { setPanel('search'); requestAnimationFrame(() => searchInputRef.current?.focus({ preventScroll: true })) }}>Rechercher un article <Icon name="search" size={17}/></button></div><div className="filters" role="tablist" aria-label="Filtrer par catégorie">{filterCategories.map(f => <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div>{catalog && <div className="catalog-toolbar"><label htmlFor="catalog-sort-select">Trier par <select id="catalog-sort-select" name="catalog_sort" value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Notre sélection</option><option value="ascending">Prix croissant</option><option value="descending">Prix décroissant</option></select></label><button onClick={() => { setFilter(''); setSearch(''); setSort('featured') }}>Réinitialiser les filtres</button></div>}
 
       {loading ? <div className="product-grid" aria-busy="true" aria-label="Chargement du catalogue">
         {[1,2,3,4].map(i => <div className="skeleton-card" key={i}>
@@ -1093,11 +1094,11 @@ export default function App() {
           </div>
         </div>)}
       </div> : <>
-      <div className="product-grid" aria-live="polite">{shown.slice(0, visibleCount).map((p, idx) => <article className="product modern-card" key={p.id} data-product-name={p.name}>
+      <div className="product-grid" aria-live="polite">{(filter === 'Tout' || !filter ? shown : shown.slice(0, visibleCount)).map((p, idx) => <article className="product modern-card" key={p.id} data-product-name={p.name}>
         <div className="product-image"><ProductGallery images={p.images} name={p.name} onOpenLightbox={handleOpenLightbox} objectPosition={getProductObjectPosition(p.name)} priority={idx < 2}/>{p.promoBadge && <span className="badge promo-badge">{p.promoBadge}</span>}{!p.inStock && <span className="badge out-of-stock-badge">Rupture</span>}{p.isFeatured && p.inStock && !p.promoBadge && <span className="badge">NOTRE SÉLECTION</span>}<button className={'favorite ' + (favorites.includes(p.id) ? 'liked' : '')} aria-label={`Favori : ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={() => setFavorites(items => items.includes(p.id) ? items.filter(id => id !== p.id) : [...items, p.id])}><Icon name="heart" size={18}/></button></div>
-        <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatMoney(p.price)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsList.length > 0 && <span>{p.colorsList.length} coloris</span>}{p.sizesList.length > 0 && <span>{p.sizesList.length} tailles</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
+        <div className="card-body"><span className="card-category">{p.category}</span><div className="product-info"><h3>{p.name}</h3><div className="price-row-container"><div className="price-block">{p.originalPrice && <span className="original-price">{formatMoney(p.originalPrice)}</span>}<b className={p.promoBadge ? 'promo-price' : ''}>{formatPriceRange(p.price, p.maxPrice)}</b></div><button type="button" className="card-share-btn" aria-label={`Partager ${p.name}`} title="Partager cet article" onClick={(e) => { e.stopPropagation(); handleShare(p); }}><Icon name="share" size={15}/></button></div></div><div className="card-options">{p.colorsList.length > 0 && <span>{p.colorsList.length} coloris</span>}{p.sizesList.length > 0 && <span>{p.sizesList.length} tailles</span>}{!p.inStock && <span className="stock-out">Indisponible</span>}</div><div className="card-actions"><button className="card-details" onClick={() => handleOpenDetails(p)}>Détails</button><button className="card-add" disabled={!p.inStock} onClick={() => addToCart(p)}><Icon name="bag" size={15}/><span>{p.inStock ? 'Ajouter' : 'Indisponible'}</span></button></div></div>
       </article>)}</div>
-      {visibleCount < shown.length && (
+      {filter && filter !== 'Tout' && visibleCount < shown.length && (
         <div className="load-more-container">
           <button
             type="button"
@@ -1251,7 +1252,7 @@ export default function App() {
         <div className="footer-grid">
           {/* Col 1 : Marque */}
           <div className="footer-col">
-            <a className="logo shop-logo" href="#" onClick={(e) => { e.preventDefault(); setPanel(''); setDetailProduct(null); setFilter('Tout'); navigateToView('home'); }}>
+            <a className="logo shop-logo" href="#" onClick={(e) => { e.preventDefault(); setPanel(''); setDetailProduct(null); setFilter(''); navigateToView('home'); }}>
               <img src="/logo.webp" alt="Logo GoodDoctor's Shop" className="footer-logo-img" width="36" height="36" loading="lazy" />
               GoodDoctor's <span className="shop-word">Shop</span>
             </a>
@@ -1269,7 +1270,7 @@ export default function App() {
             <h5 className="footer-col-title">Navigation rapide</h5>
             <ul className="footer-links">
               <li>
-                <button type="button" onClick={() => { setPanel(''); setDetailProduct(null); setFilter('Tout'); navigateToView('home'); }}>
+                <button type="button" onClick={() => { setPanel(''); setDetailProduct(null); setFilter(''); navigateToView('home'); }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                   <span>Accueil</span>
                 </button>
@@ -1493,7 +1494,7 @@ export default function App() {
           <div className="detail-price-wrapper">
             <div className="detail-price-row">
               {detailProduct.originalPrice && <span className="original-price">{formatMoney(detailProduct.originalPrice)}</span>}
-              <b className={detailProduct.promoBadge ? 'promo-price' : ''}>{formatMoney(detailProduct.price)}</b>
+              <b className={detailProduct.promoBadge ? 'promo-price' : ''}>{formatPriceRange(detailProduct.price, detailProduct.maxPrice)}</b>
               {detailProduct.promoBadge && <span className="badge promo-badge" style={{ position: 'static' }}>{detailProduct.promoBadge}</span>}
               {!detailProduct.inStock && <span className="badge out-of-stock-badge" style={{ position: 'static' }}>Rupture</span>}
             </div>
@@ -1629,7 +1630,7 @@ export default function App() {
               id: item.productId,
               name: p?.name || 'Article',
               quantity: item.quantity,
-              price: p?.price || 0,
+              price: p ? resolveVariantPrice(p, item.size, item.color) : 0,
               selectedColor: item.color || null,
               selectedSize: item.size || null,
             }
@@ -1669,12 +1670,13 @@ export default function App() {
             {cart.map((item, i) => {
               const p = products.find(p => p.id === item.productId)
               if (!p) return null
+              const unitPrice = resolveVariantPrice(p, item.size, item.color)
               return (
                 <div className="cart-item" key={i}>
                   <img src={p.images[0]?.url || placeholder} alt={p.name} loading="lazy" decoding="async" />
                   <div className="cart-item-content">
                     <b>{p.name}</b>
-                    <p>{formatMoney(p.price)} / pièce</p>
+                    <p>{formatMoney(unitPrice)} / pièce</p>
                     <div className="variant-fields">
                       <label htmlFor={`cart-size-${i}`}>
                         Taille/Format
@@ -1730,7 +1732,7 @@ export default function App() {
                       >
                         Retirer
                       </button>
-                      <b>{formatMoney(p.price * item.quantity)}</b>
+                      <b>{formatMoney(unitPrice * item.quantity)}</b>
                     </div>
                     <div className="variant-actions">
                       <button

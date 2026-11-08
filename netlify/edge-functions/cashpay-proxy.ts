@@ -506,35 +506,45 @@ export default async (req: Request, context: Context) => {
               }).catch(() => null),
             ])
 
-            const priceMap = new Map<string, number>()
+            const priceMap = new Map<string, { min: number; max: number }>()
             if (cat2Res?.ok) {
               const cat2 = await cat2Res.json()
               if (Array.isArray(cat2)) {
                 for (const row of cat2) {
-                  let price = Number(row.price || row.unit_price || 0)
-                  if (!price && Array.isArray(row.models) && row.models.length > 0) {
-                    const m = row.models[0]
-                    price = Number(m?.sale_price || 0)
-                    if (!price && Array.isArray(m?.colors) && m.colors.length > 0) {
-                      const c = m.colors[0]
-                      price = Number(c?.sale_price || 0)
-                      if (!price && Array.isArray(c?.sizes) && c.sizes.length > 0) {
-                        price = Number(c.sizes[0]?.sale_price || 0)
+                  const applyPromo = (p: number): number => {
+                    if (row.promotion_type && Number(row.promotion_value) > 0 && p > 0) {
+                      if (row.promotion_type === "percent") {
+                        return Math.round(p * (1 - Number(row.promotion_value) / 100))
+                      } else if (row.promotion_type === "amount") {
+                        return Math.max(0, p - Number(row.promotion_value))
                       }
                     }
+                    return p
                   }
-                  if (row.promotion_type && Number(row.promotion_value) > 0 && price > 0) {
-                    if (row.promotion_type === "percent") {
-                      price = Math.round(price * (1 - Number(row.promotion_value) / 100))
-                    } else if (row.promotion_type === "amount") {
-                      price = Math.max(0, price - Number(row.promotion_value))
+                  const basePrice = Number(row.price || row.unit_price || 0)
+                  let minP = basePrice > 0 ? applyPromo(basePrice) : 0
+                  let maxP = minP
+                  if (!basePrice && Array.isArray(row.models) && row.models.length > 0) {
+                    const varPrices: number[] = []
+                    for (const m of row.models) {
+                      if (Number(m?.sale_price) > 0) varPrices.push(applyPromo(Number(m.sale_price)))
+                      for (const c of m?.colors || []) {
+                        if (Number(c?.sale_price) > 0) varPrices.push(applyPromo(Number(c.sale_price)))
+                        for (const s of c?.sizes || []) {
+                          if (Number(s?.sale_price) > 0) varPrices.push(applyPromo(Number(s.sale_price)))
+                        }
+                      }
+                    }
+                    if (varPrices.length > 0) {
+                      minP = Math.min(...varPrices)
+                      maxP = Math.max(...varPrices)
                     }
                   }
                   const name = String(row.title || row.name || "").trim().toLowerCase()
                   const rawId = row._original_id || row.id
-                  if (price > 0) {
-                    if (name) priceMap.set(name, price)
-                    if (rawId !== undefined) priceMap.set(`c2-${String(rawId).toLowerCase()}`, price)
+                  if (minP > 0) {
+                    if (name) priceMap.set(name, { min: minP, max: maxP })
+                    if (rawId !== undefined) priceMap.set(`c2-${String(rawId).toLowerCase()}`, { min: minP, max: maxP })
                   }
                 }
               }
@@ -556,8 +566,8 @@ export default async (req: Request, context: Context) => {
                   const name = String(row.name || row.title || "").trim().toLowerCase()
                   const rawId = row.id
                   if (price > 0) {
-                    if (name) priceMap.set(name, price)
-                    if (rawId !== undefined) priceMap.set(`pb-${String(rawId).toLowerCase()}`, price)
+                    if (name) priceMap.set(name, { min: price, max: price })
+                    if (rawId !== undefined) priceMap.set(`pb-${String(rawId).toLowerCase()}`, { min: price, max: price })
                   }
                 }
               }
@@ -569,12 +579,17 @@ export default async (req: Request, context: Context) => {
               for (const item of payload.items) {
                 const itemId = String(item?.id || "").trim().toLowerCase()
                 const itemName = String(item?.name || "").trim().toLowerCase()
-                const dbPrice = (itemId && priceMap.get(itemId)) ?? priceMap.get(itemName)
-                if (dbPrice !== undefined) {
+                const range = (itemId && priceMap.get(itemId)) ?? priceMap.get(itemName)
+                if (range !== undefined) {
                   const qty = Math.min(99, Math.max(1, Math.round(Number(item.quantity) || 1)))
-                  item.price = dbPrice
+                  const clientItemPrice = Math.round(Number(item.price) || 0)
+                  const finalItemPrice =
+                    clientItemPrice >= range.min && clientItemPrice <= range.max
+                      ? clientItemPrice
+                      : range.min
+                  item.price = finalItemPrice
                   item.quantity = qty
-                  serverItemsTotal += dbPrice * qty
+                  serverItemsTotal += finalItemPrice * qty
                 } else {
                   allFound = false
                   break
