@@ -171,6 +171,6 @@ export async function parseAndDecryptJwe<T = any>(payload: any): Promise<T> {
     return JSON.parse(jsonText) as T
   } catch (err) {
     console.warn('[JWE] Échec du déchiffrement JWE:', err)
-    return payload as T
+    throw new Error('Impossible de déchiffrer la réponse du serveur. Veuillez rafraîchir la page.')
   }
 }

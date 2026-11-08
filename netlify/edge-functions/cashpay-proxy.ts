@@ -437,8 +437,13 @@ export default async (req: Request, context: Context) => {
         const callerDigits = String(client?.phone || "").replace(/\D/g, "")
         const ownerDigits = String(existingOrder.customer_phone || "").replace(/\D/g, "")
         const isMaskedPhone = /[•*]/.test(String(client?.phone || ""))
+        if (isMaskedPhone) {
+          return new Response(JSON.stringify({ error: "Veuillez saisir votre numéro de téléphone complet pour relancer le paiement" }), {
+            status: 403,
+            headers: secHeaders,
+          })
+        }
         if (
-          !isMaskedPhone &&
           ownerDigits.length >= 8 &&
           (callerDigits.length < 8 || callerDigits.slice(-8) !== ownerDigits.slice(-8))
         ) {

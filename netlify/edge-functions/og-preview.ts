@@ -40,8 +40,8 @@ export default async (request: Request, _context: Context): Promise<Response> =>
     return new Response(null, { status: 302, headers: { ...SECURITY_HEADERS, Location: "/" } })
   }
 
-  const baseUrl = url.origin
-  const redirectUrl = `${baseUrl}/?product=${encodeURIComponent(productId)}`
+  const configuredSiteUrl = (Deno.env.get("SITE_URL") || Deno.env.get("URL") || url.origin).replace(/\/+$/, "")
+  const redirectUrl = `${configuredSiteUrl}/?product=${encodeURIComponent(productId)}`
 
   // Détecter si la requête provient d'un robot / crawler de prévisualisation (WhatsApp, Facebook, Twitter, Telegram...)
   const ua = request.headers.get("user-agent") || ""

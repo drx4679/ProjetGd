@@ -71,7 +71,7 @@ export default function Checkout({
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
   const [acceptOutOfZone, setAcceptOutOfZone] = useState(false)
-  const [agreeLegal, setAgreeLegal] = useState(true)
+  const [agreeLegal, setAgreeLegal] = useState(false)
   const [legalWarning, setLegalWarning] = useState(false)
   const [outOfZoneWarning, setOutOfZoneWarning] = useState(false)
   const [loading, setLoading] = useState(false)
