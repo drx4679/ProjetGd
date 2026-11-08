@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-08T10:46:45.151Z",
+  "generatedAt": "2026-11-08T11:07:48.110Z",
   "catalog2": [
     {
       "id": 138,
@@ -231,6 +231,12 @@
                 {
                   "id": 97,
                   "name": "L",
+                  "sale_price": null,
+                  "is_published": true
+                },
+                {
+                  "id": 98,
+                  "name": "XL",
                   "sale_price": null,
                   "is_published": true
                 }

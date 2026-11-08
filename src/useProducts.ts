@@ -298,7 +298,7 @@ function transformPublicProduct(item: any): Product {
   })
 }
 
-const CACHE_KEY = 'gds_products_cache_v5'
+const CACHE_KEY = 'gds_products_cache_v6'
 
 function getInitialCache(): { products: Product[]; categories: string[]; ageMs: number } | null {
   try {
@@ -354,12 +354,18 @@ export function useProducts() {
   useEffect(() => {
     let cancelled = false
     let hasLiveProducts = false
+    let inFlight = false
+    let lastSig = initialCache?.products ? JSON.stringify(initialCache.products) : ''
 
     const applyProducts = (merged: Product[], persist = true) => {
       if (cancelled || merged.length === 0) return
-      const cats = new Set(merged.map(p => p.category))
-      setProducts(merged)
-      setCategories(['Tout', ...(Array.from(cats).sort() as string[])])
+      const nextSig = JSON.stringify(merged)
+      if (nextSig !== lastSig) {
+        lastSig = nextSig
+        const cats = new Set(merged.map(p => p.category))
+        setProducts(merged)
+        setCategories(['Tout', ...(Array.from(cats).sort() as string[])])
+      }
       setLoading(false)
       if (persist) {
         try {
@@ -382,13 +388,15 @@ export function useProducts() {
     }
 
     async function loadFromApi() {
+      if (cancelled || inFlight) return
+      inFlight = true
       try {
         let catalog2: any[] = []
         let publicData: any[] = []
 
         const { getJweRequestHeaders, parseAndDecryptJwe } = await import('./jweClient')
         const headers = await getJweRequestHeaders({ Accept: 'application/json' })
-        const res = await fetch('/api/products', { headers })
+        const res = await fetch('/api/products', { headers, cache: 'no-store' })
         if (res.ok) {
           const rawJson = await res.json()
           const json = await parseAndDecryptJwe<{ catalog2?: any[]; publicProducts?: any[] }>(rawJson)
@@ -407,17 +415,36 @@ export function useProducts() {
       } catch (err) {
         console.error('[Products] Erreur réseau:', err)
       } finally {
+        inFlight = false
         if (!cancelled) setLoading(false)
       }
     }
 
-    // Si le cache local est très récent (< 5 min), diffère le rafraîchissement JWE/RSA-2048 pour laisser la priorité totale au rendu et aux images
-    const delayMs = initialCache && initialCache.ageMs < 5 * 60 * 1000 ? 2500 : 0
-    const timer = window.setTimeout(loadFromApi, delayMs)
+    // Rafraîchissement immédiat au chargement + au retour sur l'onglet + synchronisation temps réel (toutes les 3 s)
+    loadFromApi()
+
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadFromApi()
+      }
+    }
+
+    window.addEventListener('focus', onVisibilityOrFocus)
+    document.addEventListener('visibilitychange', onVisibilityOrFocus)
+    window.addEventListener('online', onVisibilityOrFocus)
+
+    const pollInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadFromApi()
+      }
+    }, 3000)
 
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
+      window.removeEventListener('focus', onVisibilityOrFocus)
+      document.removeEventListener('visibilitychange', onVisibilityOrFocus)
+      window.removeEventListener('online', onVisibilityOrFocus)
+      window.clearInterval(pollInterval)
     }
   }, [initialCache])
 

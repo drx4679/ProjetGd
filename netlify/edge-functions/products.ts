@@ -51,9 +51,9 @@ function checkRateLimit(ip: string): boolean {
   return entry.count <= 60
 }
 
-// Cache mémoire du catalogue nettoyé (60 s) pour éviter de solliciter Supabase à chaque chiffrement JWE
-let cachedCatalogPayload: { catalog2: any[]; publicProducts: any[] } | null = null
-let cachedCatalogExpiresAt = 0
+// Cache mémoire court du catalogue brut (3 s) ; l'état de disponibilité des variantes est toujours lu en temps réel
+let cachedRawRpc: { rawCatalog2: unknown[]; rawPublicProducts: unknown[] } | null = null
+let cachedRawRpcExpiresAt = 0
 
 // Clé publique RSA-OAEP-256 de secours côté serveur (utilisée si quelqu'un ouvre /api/products
 // directement dans un onglet ou via curl sans en-tête X-Pub-Key : la réponse reste 100 % chiffrée en JWE)
@@ -174,6 +174,7 @@ async function callRpc(url: string, key: string, fn: string): Promise<unknown[]>
     method: "POST",
     headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: "{}",
+    cache: "no-store",
     signal: AbortSignal.timeout(8000),
   })
   if (!res.ok) return []
@@ -203,7 +204,7 @@ async function fetchVariantAvailabilityState(
 
   const fetchJson = async (fullUrl: string, headers: Record<string, string>): Promise<any[]> => {
     try {
-      const r = await fetch(fullUrl, { headers, signal: AbortSignal.timeout(6000) })
+      const r = await fetch(fullUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(6000) })
       if (!r.ok) return []
       const d = await r.json()
       return Array.isArray(d) ? d : []
@@ -489,24 +490,28 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    let payload = cachedCatalogPayload
-    if (!payload || Date.now() >= cachedCatalogExpiresAt) {
-      const [rawCatalog2, rawPublicProducts, availabilityState] = await Promise.all([
-        callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
-        callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
-        fetchVariantAvailabilityState(supabaseUrl, supabaseKey),
-      ])
+    const needRpcRefresh = !cachedRawRpc || Date.now() >= cachedRawRpcExpiresAt
+    const [rpcResult, availabilityState] = await Promise.all([
+      needRpcRefresh
+        ? Promise.all([
+            callRpc(supabaseUrl, supabaseKey, "get_catalog2_articles").catch(() => []),
+            callRpc(supabaseUrl, supabaseKey, "get_public_products").catch(() => []),
+          ]).then(([rawCatalog2, rawPublicProducts]) => {
+            if (rawCatalog2.length > 0 || rawPublicProducts.length > 0) {
+              cachedRawRpc = { rawCatalog2, rawPublicProducts }
+              cachedRawRpcExpiresAt = Date.now() + 3_000
+            }
+            return { rawCatalog2, rawPublicProducts }
+          })
+        : Promise.resolve(cachedRawRpc!),
+      fetchVariantAvailabilityState(supabaseUrl, supabaseKey),
+    ])
 
-      const catalog2 = rawCatalog2
-        .map((item) => sanitizeCatalog2Item(item, availabilityState.hiddenSet, availabilityState.direct))
-        .filter(Boolean)
-      const publicProducts = rawPublicProducts.map(sanitizePublicItem).filter(Boolean)
-      payload = { catalog2, publicProducts }
-      if (catalog2.length > 0 || publicProducts.length > 0) {
-        cachedCatalogPayload = payload
-        cachedCatalogExpiresAt = Date.now() + 10_000
-      }
-    }
+    const catalog2 = rpcResult.rawCatalog2
+      .map((item) => sanitizeCatalog2Item(item, availabilityState.hiddenSet, availabilityState.direct))
+      .filter(Boolean)
+    const publicProducts = rpcResult.rawPublicProducts.map(sanitizePublicItem).filter(Boolean)
+    const payload = { catalog2, publicProducts }
 
     const clientPubKey = req.headers.get("x-pub-key")
     const jwe = await encryptPayloadAsJwe(payload, clientPubKey)

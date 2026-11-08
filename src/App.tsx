@@ -350,6 +350,38 @@ export default function App() {
     }
   }, [products, handleOpenDetails])
 
+  // Synchronisation temps réel de la fiche produit ouverte et du panier quand les variantes changent
+  useEffect(() => {
+    if (products.length === 0) return
+    setDetailProduct(prev => {
+      if (!prev) return null
+      const fresh = products.find(p => p.id === prev.id)
+      return fresh && fresh !== prev ? fresh : prev
+    })
+    setCart(prevCart => {
+      let changed = false
+      const nextCart = prevCart.map(item => {
+        const p = products.find(pr => pr.id === item.productId)
+        if (!p) return item
+        let nextColor = item.color
+        if (p.colorsList.length > 0 && !p.colorsList.includes(nextColor)) {
+          nextColor = p.colorsList[0]
+        }
+        const allowedSizes = getAvailableSizesForColor(p, nextColor)
+        let nextSize = item.size
+        if (allowedSizes.length > 0 && !allowedSizes.includes(nextSize)) {
+          nextSize = allowedSizes.includes('M') ? 'M' : allowedSizes[0]
+        }
+        if (nextColor !== item.color || nextSize !== item.size) {
+          changed = true
+          return { ...item, color: nextColor, size: nextSize, confirmed: false }
+        }
+        return item
+      })
+      return changed ? nextCart : prevCart
+    })
+  }, [products])
+
   // Titre d'onglet dynamique quand un article est ouvert
   useEffect(() => {
     if (!detailProduct) return
