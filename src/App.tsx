@@ -953,7 +953,7 @@ export default function App() {
             {favorites.length > 0 && <span className="fav-counter">{favorites.length}</span>}
           </span>
         </button>
-        <button aria-label="Ouvrir le panier" className="cart-button" onClick={() => setPanel('cart')}><Icon name="bag"/><span aria-live="polite" aria-atomic="true">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></button>
+        <button aria-label="Panier" className="cart-button" onClick={() => setPanel('cart')}><Icon name="bag"/><span aria-live="polite" aria-atomic="true">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></button>
       </div>
     </header>
     {panel === 'search' && (
@@ -1304,7 +1304,7 @@ export default function App() {
 
           {/* Col 2 : Navigation rapide */}
           <div className="footer-col">
-            <h5 className="footer-col-title">Navigation rapide</h5>
+            <h2 className="footer-col-title">Navigation rapide</h2>
             <ul className="footer-links">
               <li>
                 <button type="button" onClick={() => { setPanel(''); setDetailProduct(null); setFilter(''); navigateToView('home'); }}>
@@ -1347,7 +1347,7 @@ export default function App() {
 
           {/* Col 3 : Contact */}
           <div className="footer-col">
-            <h5 className="footer-col-title">Contact</h5>
+            <h2 className="footer-col-title">Contact</h2>
             <ul className="footer-links">
               <li>
                 <a href="tel:+22892733939">
@@ -1372,7 +1372,7 @@ export default function App() {
 
           {/* Col 4 : Réseaux */}
           <div className="footer-col">
-            <h5 className="footer-col-title">Suivez-nous</h5>
+            <h2 className="footer-col-title">Suivez-nous</h2>
             <div className="footer-socials">
               <a href="https://www.instagram.com/gooddoctors_shop?igsh=bTV0bjhtd2xja3Nw" target="_blank" rel="noopener noreferrer" aria-label="Suivez-nous sur Instagram">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
