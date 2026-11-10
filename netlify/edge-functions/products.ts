@@ -48,7 +48,7 @@ function checkRateLimit(ip: string): boolean {
     return true
   }
   entry.count++
-  return entry.count <= 600
+  return entry.count <= 60
 }
 
 // Catalogue brut maintenu en mémoire avec rafraîchissement non-bloquant (stale-while-revalidate)

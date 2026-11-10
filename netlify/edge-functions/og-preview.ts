@@ -16,6 +16,25 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Vary": "User-Agent",
 }
 
+// Rate limiting : 30 req/min par IP (protection contre le scraping de previews)
+const rateMap = new Map<string, { start: number; count: number }>()
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  if (rateMap.size > 1000) {
+    for (const [k, v] of rateMap) {
+      if (now - v.start > 60000) rateMap.delete(k)
+    }
+  }
+  const entry = rateMap.get(ip)
+  if (!entry || now - entry.start > 60000) {
+    rateMap.set(ip, { start: now, count: 1 })
+    return true
+  }
+  entry.count++
+  return entry.count <= 30
+}
+
 function escapeHtmlAttr(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -26,6 +45,15 @@ function escapeHtmlAttr(str: string): string {
 }
 
 export default async (request: Request, _context: Context): Promise<Response> => {
+  // Rate limiting par IP
+  const clientIp = _context?.ip || "127.0.0.1"
+  if (!checkRateLimit(clientIp)) {
+    return new Response("Too many requests", {
+      status: 429,
+      headers: { ...SECURITY_HEADERS, "Retry-After": "60" },
+    })
+  }
+
   const url = new URL(request.url)
 
   // Extraire le productId (/p/C2-138 -> C2-138)
@@ -67,7 +95,7 @@ export default async (request: Request, _context: Context): Promise<Response> =>
 
     // 1. Chercher dans le snapshot pré-compilé (très rapide, sur le CDN)
     try {
-      const res = await fetch(`${baseUrl}/products-snapshot.json`)
+      const res = await fetch(`${configuredSiteUrl}/products-snapshot.json`)
       if (res.ok) {
         const snapshot = await res.json()
         const catalog2Items = snapshot.catalog2 || []
@@ -195,9 +223,9 @@ export default async (request: Request, _context: Context): Promise<Response> =>
     const validHttpsImage = /^https:\/\/[^\s"'<>]+$/i.test(imageUrl) ? imageUrl : ""
     const ogImageUrl = validHttpsImage
       ? `https://wsrv.nl/?url=${encodeURIComponent(validHttpsImage)}&w=800&h=800&fit=contain&bg=ffffff&output=jpg&q=80`
-      : `${baseUrl}/logo.png`
+      : `${configuredSiteUrl}/logo.png`
 
-    const shareUrl = `${baseUrl}/p/${productId}`
+    const shareUrl = `${configuredSiteUrl}/p/${productId}`
     const safeTitle = escapeHtmlAttr(title)
     const safeDesc = escapeHtmlAttr(description.substring(0, 200))
 
