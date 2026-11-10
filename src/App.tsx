@@ -87,15 +87,31 @@ function ProductGallery({
   const [mainLoaded, setMainLoaded] = useState(false)
   const views = images.length > 0 ? images.map(i => i.url) : [placeholder]
   const current = views[view] || views[0]
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setMainLoaded(true)
+    }
+  }, [current])
+
   return <div className="article-gallery">
     <img
+      ref={imgRef}
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"
       className={'gallery-main view-' + view}
       src={current}
       alt={`${name} — vue ${view + 1}`}
-      onLoad={() => { if (!mainLoaded) setMainLoaded(true) }}
+      onLoad={() => { setMainLoaded(true) }}
+      onError={(e) => {
+        const target = e.currentTarget
+        if (target.src !== placeholder) {
+          target.src = placeholder
+        }
+        setMainLoaded(true)
+      }}
       onClick={() => onOpenLightbox(views, view, name)}
       style={{
         cursor: 'zoom-in',
@@ -103,7 +119,7 @@ function ProductGallery({
       }}
     />
     {views.length > 1 && mainLoaded && <div className="gallery-thumbnails" aria-label={`Vues de ${name}`}>
-      {views.slice(0, 4).map((src, i) => <button key={i} type="button" aria-label={`Vue ${i + 1}`} aria-pressed={view === i} onClick={() => setView(i)}><img loading="lazy" decoding="async" width="30" height="32" src={src} alt="" /><span>Vue {i + 1}</span></button>)}
+      {views.slice(0, 4).map((src, i) => <button key={i} type="button" aria-label={`Vue ${i + 1}`} aria-pressed={view === i} onClick={() => setView(i)}><img loading="lazy" decoding="async" width="30" height="32" src={src} alt="" onError={(e) => { e.currentTarget.src = placeholder }} /><span>Vue {i + 1}</span></button>)}
     </div>}
   </div>
 }
