@@ -599,7 +599,7 @@ export default function OrderTracking({
               </div>
               <h3 className="track-empty-heading">Aucune commande trouvée</h3>
               <p className="track-empty-sub">
-                Aucun résultat pour <span className="font-mono text-zinc-800">{phone ? normalizePhoneInput(countryCode, phone) : reference}</span>. Vérifiez les informations saisies lors de la commande.
+                Aucun résultat pour <span className="font-mono text-zinc-800 dark:text-zinc-200">{phone ? normalizePhoneInput(countryCode, phone) : reference}</span>. Vérifiez les informations saisies lors de la commande.
               </p>
               <a
                 href={`https://wa.me/22892733939?text=${encodeURIComponent(
